@@ -76,6 +76,7 @@
   #possMsg { font-size: 18px; color: #f0d0c0; text-shadow: 0 0 6px #000; margin-bottom: 10px; }
   #possCode { font-family: Consolas, monospace; font-size: 58px; letter-spacing: 14px; font-weight: 800; color: #fff;
     text-shadow: 0 0 12px #f00, 0 0 3px #000; }
+  #possCode span { display: inline-block; }
   #possCode span.ok { color: #555; text-shadow: none; }
   #possCode span.cur { text-decoration: underline; }
   #possBar { width: min(420px, 80vw); height: 6px; margin: 14px auto 0; background: rgba(0,0,0,.6); }
@@ -143,7 +144,7 @@
   <canvas id="possFace" width="1024" height="1024"></canvas>
   <div id="possTint"></div>
   <div id="possTop">
-    <div id="possMsg">몸을 빼앗기고 있다 — 글자를 입력해 되찾아라</div>
+    <div id="possMsg">몸을 빼앗기고 있다 — 글자를 입력해 되찾아라 (틀리면 처음부터)</div>
     <div id="possCode"></div>
     <div id="possBar"><div></div></div>
   </div>
@@ -165,7 +166,7 @@
   <div class="keys">
     산 곳곳에 봉인된 <b style="color:var(--paper)">부적 10장</b>을 모아 팔척귀신의 얼굴에 붙이면 산을 나갈 수 있다.<br>
     묘지 3 · 악에 물든 강 3 · 나무 아래 2 · 바위 위 1 · 폐가 1<br>
-    귀신 가까이 가면 몸을 빼앗길 수 있다. 화면 위의 <b>영어 글자</b>를 순서대로 눌러 되찾아라. (한/영 상관없음)<br>
+    귀신 가까이 가면 <b style="color:#e04040">반드시</b> 몸을 빼앗긴다. 화면 위의 <b>영어 글자</b>를 빠르게 순서대로 눌러 되찾아라.<br>틀리면 처음부터 다시! (한/영 상관없음)<br>
     WASD 이동 · 마우스 시점 · Shift 달리기 · Space 점프 · E 줍기 · F 손전등 · Tab 수첩 · 클릭 부적 붙이기
   </div>
   <button class="btn" id="startBtn">산으로 들어가기</button>
@@ -958,7 +959,7 @@ function palUpdate(dt) {
   g.rotation.y = Math.atan2(dx, dz);
   const reach = PAL.state === 'chase' ? -1.25 : 0;
   ud.arms.forEach((a, i) => { a.rotation.x = lerp(a.rotation.x, reach + Math.sin(gameTime * 9 + i) * (reach ? 0.08 : 0), 0.1); });
-  if (g.visible && d < 12) tryPossess(PAL, d, 10, 0.22, dt);
+  if (g.visible && d < 12) tryPossess(PAL, d, 10);
 }
 function startChase() { PAL.state = 'chase'; PAL.chaseT = MR(8, 12); PAL.g.visible = true; }
 
@@ -984,7 +985,7 @@ function waterUpdate(gh, dt) {
     const cx = riverX(gh.z); gh.x = clamp(gh.x, cx - 8, cx + 8); gh.z = clamp(gh.z, gh.home - 26, gh.home + 26);
     if (d > 24) gh.state = 'sink';
     if (d < 1.1 && invuln <= 0 && possCD <= 0) startPossession(gh);
-    else tryPossess(gh, d, 8, 0.4, dt);
+    else tryPossess(gh, d, 8);
   } else if (gh.state === 'sink') {
     gh.y -= dt * 1.4; if (gh.y < -2.4) { gh.state = 'under'; gh.cd = 6; }
   }
@@ -1028,7 +1029,7 @@ function japUpdate(gh, dt) {
     }
     gh.giggle -= dt; if (gh.giggle <= 0) { gh.giggle = MR(6, 14); if (d < 14) giggle(0.6 * (1 - d / 14)); }
     if (d < 1.0 && invuln <= 0 && possCD <= 0) startPossession(gh);
-    else tryPossess(gh, d, 6, 0.45, dt);
+    else tryPossess(gh, d, 6);
   } else {
     const tx = gh.tx - gh.x, tz = gh.tz - gh.z, td = Math.hypot(tx, tz);
     if (td < 0.5) { gh.tx = clamp(gh.x + MR(-15, 15), -85, 85); gh.tz = clamp(gh.z + MR(-15, 15), -85, 85); }
@@ -1042,16 +1043,18 @@ function japUpdate(gh, dt) {
 //  빙의
 // =====================================================================
 const POS = { gh: null, code: '', idx: 0, t: 0, limit: 0, flick: 0 };
-function tryPossess(gh, d, range, base, dt) {
+// 범위 안에 들어오면 100% 빙의 (쉬는 시간 중에는 안 됨)
+function tryPossess(gh, d, range) {
   if (possCD > 0 || invuln > 0 || mode !== 'play' || gameTime < 20) return;
-  if (d < range && Math.random() < (base * (1 - d / range) + base * 0.25) * dt) startPossession(gh);
+  if (d < range) startPossession(gh);
 }
 function drawFaceTo(cv, kind) { const x = cv.getContext('2d'); x.clearRect(0, 0, cv.width, cv.height); x.drawImage(FACE[kind], 0, 0, cv.width, cv.height); }
 function startPossession(gh) {
   if (mode !== 'play') return;
   mode = 'possess'; stats.possessed++;
-  const L = 5 + Math.floor(found / 4), A = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  POS.gh = gh; POS.code = Array.from({ length: L }, () => A[Math.random() * 26 | 0]).join(''); POS.idx = 0; POS.t = 0; POS.limit = 2.5 + L * 0.95;
+  // 글자 수: 부적 0~2장 6개 → 9~10장 9개. 제한 시간: 1.5초 + 글자당 0.55초
+  const L = 6 + Math.floor(found / 3), A = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  POS.gh = gh; POS.code = Array.from({ length: L }, () => A[Math.random() * 26 | 0]).join(''); POS.idx = 0; POS.t = 0; POS.limit = 1.5 + L * 0.55;
   drawFaceTo($('possFace'), gh.kind); renderCode();
   $('possess').classList.remove('hidden'); $('notebook').classList.add('hidden');
   gh.g.visible = true; sting(0.9); scream(0.35); shake = 0.5;
@@ -1064,7 +1067,7 @@ function possKey(e) {
   if (!e.code.startsWith('Key')) return;
   const ch = e.code.slice(3);
   if (ch === POS.code[POS.idx]) { POS.idx++; renderCode(); click(); if (POS.idx >= POS.code.length) possessSuccess(); }
-  else { POS.t += 0.6; shake = 0.4; $('redwash').style.opacity = 1; thump(0.6); }
+  else { POS.idx = 0; renderCode(); POS.t += 0.5; shake = 0.5; $('redwash').style.opacity = 1; thump(0.7); }
 }
 function possUpdate(dt) {
   POS.t += dt; const k = clamp(POS.t / POS.limit, 0, 1), gh = POS.gh;
@@ -1074,6 +1077,8 @@ function possUpdate(dt) {
   cv.style.transform = `translate(calc(-50% + ${jx}px), calc(-50% + ${jy}px)) scale(${s}) rotate(${Math.sin(gameTime * 7) * 3}deg)`;
   POS.flick -= dt;
   if (POS.flick <= 0) { POS.flick = MR(0.6, 1.6); cv.style.filter = 'invert(1) contrast(1.6)'; setTimeout(() => { cv.style.filter = 'contrast(1.25)'; }, 60); }
+  // 글자가 흔들려서 읽기 어려워짐 (시간이 갈수록 더 심하게)
+  for (const sp of $('possCode').children) if (!sp.classList.contains('ok')) sp.style.transform = `translate(${MR(-1, 1) * (2 + k * 9)}px, ${MR(-1, 1) * (2 + k * 9)}px) rotate(${MR(-1, 1) * k * 18}deg)`;
   $('possBar').firstElementChild.style.width = ((1 - k) * 100) + '%';
   // 몸이 저절로 귀신 쪽으로
   const hx = gh.g.position.x, hz = gh.g.position.z;
