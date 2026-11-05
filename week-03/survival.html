@@ -1,0 +1,2063 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>숲의 생존자</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#000;font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;color:#eee}
+  canvas{display:block}
+  #overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(8,14,10,.72);z-index:10}
+  #panel{max-width:520px;padding:30px 36px;background:rgba(20,28,22,.94);border:1px solid #3c5040;border-radius:10px;text-align:center}
+  #panel h1{margin:0 0 4px;font-size:34px;letter-spacing:3px;color:#d3e6c6}
+  #panel .sub{color:#9fb59a;margin-bottom:20px;font-size:14px}
+  #keys{display:grid;grid-template-columns:auto auto;gap:7px 16px;text-align:left;margin:0 auto 22px;width:max-content;font-size:14px}
+  kbd{background:#2c3a2f;border:1px solid #4d6452;border-radius:4px;padding:1px 7px;font-family:inherit;font-size:13px}
+  #startBtn{font-size:18px;padding:10px 36px;background:#5d7f4a;color:#fff;border:0;border-radius:6px;cursor:pointer}
+  #startBtn:disabled{background:#3b4a36;color:#999;cursor:wait}
+  #startBtn:not(:disabled):hover{background:#6e9658}
+  #warn{margin-top:14px;font-size:12px;color:#c9a777;line-height:1.5}
+  #hud{position:fixed;inset:0;pointer-events:none;z-index:5;display:none}
+  #cross{position:absolute;left:50%;top:50%;width:4px;height:4px;margin:-2px 0 0 -2px;background:rgba(255,255,255,.85);border-radius:50%;box-shadow:0 0 2px #000}
+  #clock{position:absolute;left:16px;top:14px;font-size:18px;text-shadow:0 1px 3px #000}
+  #info{position:absolute;left:16px;top:42px;font-size:13px;color:#cfd8c8;text-shadow:0 1px 2px #000}
+  #state{position:absolute;left:50%;bottom:26px;transform:translateX(-50%);font-size:14px;color:#e4e8dc;text-shadow:0 1px 2px #000}
+  #fsWarn{position:absolute;right:16px;top:14px;font-size:12px;color:#ffcf8a;text-shadow:0 1px 2px #000;display:none}
+  #state{bottom:132px}
+  /* 핫바와 슬롯 */
+  #hotbar{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);display:flex;gap:4px}
+  .slot{width:50px;height:50px;background:rgba(15,20,16,.62);border:2px solid rgba(160,175,150,.35);border-radius:6px;position:relative;box-sizing:border-box}
+  .slot.sel{border-color:#f0e6b8;background:rgba(48,52,34,.8)}
+  .slot img{position:absolute;left:5px;top:5px;width:36px;height:36px;pointer-events:none}
+  .slot .n{position:absolute;right:4px;bottom:1px;font-size:12px;font-weight:bold;text-shadow:0 1px 2px #000;pointer-events:none}
+  .slot .k{position:absolute;left:4px;top:1px;font-size:10px;color:#aab3a4;pointer-events:none}
+  /* 체력·배고픔·목마름·체온 */
+  #stats{position:absolute;left:50%;bottom:72px;transform:translateX(-50%);width:536px;display:flex;justify-content:space-between;align-items:flex-end}
+  #hearts{font-size:20px;letter-spacing:-1px;line-height:1}
+  .h{color:#d8293a;text-shadow:0 1px 2px #000}
+  .h.half{background:linear-gradient(90deg,#d8293a 50%,#3b2b2d 50%);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:none}
+  .h.empty{color:#3b2b2d}
+  #bars{display:flex;flex-direction:column;gap:3px;font-size:12px}
+  .bar{display:flex;align-items:center;gap:6px;text-shadow:0 1px 2px #000;justify-content:flex-end}
+  .bar .track{width:110px;height:8px;background:rgba(0,0,0,.55);border-radius:4px;overflow:hidden}
+  .bar .fill{height:100%}
+  .bar .num{width:28px;text-align:right}
+  #prompt{position:absolute;left:50%;top:calc(50% + 24px);transform:translateX(-50%);font-size:14px;background:rgba(0,0,0,.45);padding:3px 10px;border-radius:4px;display:none}
+  #toast{position:absolute;left:50%;bottom:156px;transform:translateX(-50%);font-size:14px;text-shadow:0 1px 3px #000;opacity:0;transition:opacity .3s;white-space:nowrap}
+  /* 인벤토리 창 */
+  #inv{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.45);z-index:8}
+  #invBox{background:rgba(22,28,23,.95);border:1px solid #4b5e4d;border-radius:10px;padding:16px 18px;user-select:none}
+  #invBox h2{margin:0 0 4px;font-size:18px;color:#d3e6c6}
+  #invInfo{font-size:13px;color:#b9c7b2;margin-bottom:10px;min-height:18px}
+  #invGrid{display:grid;grid-template-columns:repeat(10,50px);gap:4px}
+  #invGrid .slot{cursor:pointer}
+  #invGrid .slot:hover{border-color:#cfd8b0}
+  .sep{grid-column:1/-1;height:6px}
+  #invHint{font-size:12px;color:#8f9d8a;margin-top:10px}
+  #craftRow{display:flex;align-items:center;gap:14px;margin-bottom:12px}
+  #craftGrid{display:grid;grid-template-columns:repeat(4,50px);gap:4px}
+  #craftOut{cursor:pointer}
+  #craftOut.ready{border-color:#e8d27a;box-shadow:0 0 8px rgba(232,210,122,.5)}
+  #arrow{font-size:26px;color:#9fb59a;padding-top:16px}
+  .lbl{font-size:12px;color:#9fb59a;margin-bottom:4px}
+  #recipes{margin-left:auto;align-self:flex-start;font-size:12px;color:#cfd8c8;min-width:170px}
+  .rec{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .mini{display:grid;gap:1px}
+  .mini span,.mini img{width:16px;height:16px;display:block;background:rgba(255,255,255,.08)}
+  .dur{position:absolute;left:6px;right:6px;bottom:3px;height:3px;background:#222;pointer-events:none}
+  .dur div{height:100%}
+  #invBox{max-height:94vh;overflow-y:auto}
+  #recipes{max-height:250px;overflow-y:auto;padding-right:6px}
+  .rcat{color:#e8d27a;margin:8px 0 4px;font-weight:bold}
+  .needs{display:flex;gap:3px;align-items:center}
+  .need{display:flex;align-items:center;font-size:11px;gap:1px}
+  .need img{width:16px;height:16px}
+  #furnRow{display:none;gap:16px;align-items:flex-start;margin-bottom:12px}
+  .fin{display:flex;gap:4px}
+  .fbar{width:50px;height:6px;background:#222;margin-top:4px;border-radius:3px;overflow:hidden}
+  #fFlame{height:100%;width:0;background:linear-gradient(90deg,#f40,#fc4)}
+  .fprog{width:70px;height:10px;background:#222;border-radius:5px;overflow:hidden;margin-top:20px}
+  #fProg{height:100%;width:0;background:#e8d27a}
+  #fState{font-size:12px;color:#c9d3c2;max-width:200px;padding-top:20px}
+  #adminRow{display:none;margin-top:12px}
+  #adminGrid{display:grid;grid-template-columns:repeat(14,36px);gap:3px}
+  #adminGrid .slot{width:36px;height:36px;cursor:pointer}
+  #adminGrid .slot img{left:2px;top:2px;width:28px;height:28px}
+  #chat{position:fixed;left:16px;bottom:170px;width:440px;z-index:9;pointer-events:none}
+  #chatLog div{font-size:13px;color:#eef;text-shadow:0 1px 2px #000;background:rgba(0,0,0,.35);padding:2px 8px;margin-top:2px;border-radius:3px;transition:opacity 1s}
+  #chatLog div.fade{opacity:0}
+  #chatLog.open div{opacity:1}
+  #chatIn{display:none;width:100%;box-sizing:border-box;margin-top:4px;padding:6px 8px;font-size:14px;background:rgba(0,0,0,.7);color:#fff;border:1px solid #6a7a6a;border-radius:4px;pointer-events:auto;font-family:inherit}
+  #hurt{position:fixed;inset:0;pointer-events:none;background:radial-gradient(circle,rgba(200,0,0,0) 40%,rgba(200,0,0,.8));opacity:0;transition:opacity .25s;z-index:4}
+  #held{position:fixed;width:40px;height:40px;pointer-events:none;z-index:9;display:none}
+  #held img{width:40px;height:40px}
+  #held .n{position:absolute;right:-2px;bottom:-4px;font-size:12px;font-weight:bold;text-shadow:0 1px 2px #000}
+</style>
+</head>
+<body>
+<div id="overlay">
+  <div id="panel">
+    <h1>숲의 생존자</h1>
+    <div class="sub">3단계 · 도구·광물·화로·블록</div>
+    <div id="keys">
+      <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span><span>이동</span>
+      <span><kbd>Space</kbd></span><span>점프 (물속에서는 위로 헤엄)</span>
+      <span><kbd>Shift</kbd></span><span>웅크리기</span>
+      <span><kbd>Ctrl</kbd></span><span>달리기</span>
+      <span>마우스</span><span>둘러보기</span>
+      <span>좌클릭</span><span>줍기 · 베기 · 캐기 · 땅 파기 (누르고 있으면 계속)</span>
+      <span>우클릭</span><span>블록·횃불 놓기 · 화로 열기</span>
+      <span><kbd>/</kbd></span><span>채팅 (명령어)</span>
+      <span><kbd>E</kbd></span><span>인벤토리 열기/닫기</span>
+      <span><kbd>Q</kbd></span><span>든 물건 1개 버리기</span>
+      <span>마우스 휠 · <kbd>1</kbd>~<kbd>0</kbd></span><span>핫바 칸 바꾸기</span>
+      <span><kbd>Esc</kbd></span><span>멈춤</span>
+      <span><kbd>T</kbd></span><span>시간 빨리 감기 (시험용)</span>
+    </div>
+    <button id="startBtn" disabled>숲을 만드는 중…</button>
+    <div id="warn">전체 화면으로 시작해요. 전체 화면이 아닐 때 Ctrl+W 를 누르면<br>브라우저 탭이 닫힐 수 있으니 조심해요.</div>
+  </div>
+</div>
+<div id="hud">
+  <div id="cross"></div>
+  <div id="clock"></div>
+  <div id="info"></div>
+  <div id="state"></div>
+  <div id="fsWarn">⚠ 전체 화면이 아니에요 · Ctrl+W 조심</div>
+  <div id="prompt"></div>
+  <div id="toast"></div>
+  <div id="stats">
+    <div id="hearts"></div>
+    <div id="bars">
+      <div class="bar"><span>🍖 배고픔</span><div class="track"><div class="fill" id="fHunger" style="background:#c98a3c"></div></div><span class="num" id="tHunger"></span></div>
+      <div class="bar"><span>💧 목마름</span><div class="track"><div class="fill" id="fThirst" style="background:#3a90d4"></div></div><span class="num" id="tThirst"></span></div>
+      <div class="bar"><span id="tTemp"></span></div>
+    </div>
+  </div>
+  <div id="hotbar"></div>
+</div>
+<div id="inv">
+  <div id="invBox">
+    <h2 id="invTitle">인벤토리</h2>
+    <div id="furnRow">
+      <div><div class="lbl">재료 (2칸: 청동은 구리+주석)</div><div class="fin"><div id="fs0"></div><div id="fs1"></div></div></div>
+      <div><div class="lbl">연료</div><div id="fs2"></div><div class="fbar"><div id="fFlame"></div></div></div>
+      <div><div class="lbl">&nbsp;</div><div class="fprog"><div id="fProg"></div></div></div>
+      <div><div class="lbl">결과</div><div id="fs3"></div></div>
+      <div id="fState"></div>
+    </div>
+    <div id="craftRow">
+      <div><div class="lbl">제작대 (4×4)</div><div id="craftGrid"></div></div>
+      <div id="arrow">➜</div>
+      <div><div class="lbl">결과</div><div id="craftOut" class="slot"></div></div>
+      <div id="recipes"><div class="lbl">만들 수 있는 것</div><div id="recipeList"></div></div>
+    </div>
+    <div id="invInfo"></div>
+    <div id="invGrid"></div>
+    <div id="adminRow"><div class="lbl">🛠 관리자 · 모든 아이템 (클릭하면 한 묶음)</div><div id="adminGrid"></div></div>
+    <div id="invHint">클릭: 집기·놓기 · 오른쪽 클릭: 반 나누기·1개 놓기 · 창 밖 클릭: 버리기 · Q: 가리킨 칸 1개 버리기 · E: 닫기<br>제작대에 레시피 모양대로 놓으면 결과 칸에 나와요. 결과 칸을 클릭해서 가져가요.</div>
+  </div>
+</div>
+<div id="held"></div>
+<div id="chat"><div id="chatLog"></div><input id="chatIn" maxlength="60" autocomplete="off" placeholder="명령어를 입력하고 Enter (Esc: 닫기)"></div>
+<div id="hurt"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+'use strict';
+// ================= 설정 =================
+const CHUNK = 48;            // 청크 한 변 (m)
+const RES = 1.5;             // 땅 격자 간격 (m)
+const SEG = CHUNK / RES;     // 32칸
+const VIEW_R = 4;            // 몇 청크까지 불러올지
+const GRASS_R = 1;           // 풀을 심을 범위 (청크)
+const WATER_Y = -7;          // 물 높이
+const DAY_SECONDS = 1200;    // 하루 = 20분
+const SEED = Math.floor(Math.random() * 1e9);
+
+// ================= 난수와 노이즈 =================
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function hash3(a,b,c){let h=Math.imul(a|0,374761393)^Math.imul(b|0,668265263)^Math.imul(c|0,1274126177);h=Math.imul(h^(h>>>13),1103515245);return (h^(h>>>16))>>>0;}
+function makeNoise(seed){
+  const rnd=mulberry32(seed), p=new Uint8Array(256);
+  for(let i=0;i<256;i++)p[i]=i;
+  for(let i=255;i>0;i--){const j=Math.floor(rnd()*(i+1));const t=p[i];p[i]=p[j];p[j]=t;}
+  const perm=new Uint8Array(512);for(let i=0;i<512;i++)perm[i]=p[i&255];
+  const G=[[1,1],[-1,1],[1,-1],[-1,-1],[1,0],[-1,0],[0,1],[0,-1]];
+  const F2=0.5*(Math.sqrt(3)-1),G2=(3-Math.sqrt(3))/6;
+  return function(x,y){
+    const s=(x+y)*F2,i=Math.floor(x+s),j=Math.floor(y+s),t=(i+j)*G2;
+    const x0=x-(i-t),y0=y-(j-t),i1=x0>y0?1:0,j1=x0>y0?0:1;
+    const x1=x0-i1+G2,y1=y0-j1+G2,x2=x0-1+2*G2,y2=y0-1+2*G2,ii=i&255,jj=j&255;
+    let n=0,q;
+    q=0.5-x0*x0-y0*y0;if(q>0){const g=G[perm[ii+perm[jj]]&7];q*=q;n+=q*q*(g[0]*x0+g[1]*y0);}
+    q=0.5-x1*x1-y1*y1;if(q>0){const g=G[perm[ii+i1+perm[jj+j1]]&7];q*=q;n+=q*q*(g[0]*x1+g[1]*y1);}
+    q=0.5-x2*x2-y2*y2;if(q>0){const g=G[perm[ii+1+perm[jj+1]]&7];q*=q;n+=q*q*(g[0]*x2+g[1]*y2);}
+    return 70*n;
+  };
+}
+const nH=makeNoise(SEED), nD=makeNoise(SEED+1), nF=makeNoise(SEED+2), nT=makeNoise(SEED+3);
+function fbm(n,x,z,o){let s=0,a=1,f=1,t=0;for(let i=0;i<o;i++){s+=a*n(x*f,z*f);t+=a;a*=0.5;f*=2.03;}return s/t;}
+function smooth(a,b,x){let t=(x-a)/(b-a);t=t<0?0:t>1?1:t;return t*t*(3-2*t);}
+const V=(x,y,z)=>new THREE.Vector3(x,y,z);
+
+// ================= 지형 =================
+function terrainH(x,z){
+  const big=fbm(nH,x/420,z/420,4);
+  const mid=fbm(nH,x/110+50,z/110-30,3);
+  const ridge=1-Math.abs(nH(x/260+200,z/260+100));
+  return big*26 + mid*7 + nD(x/18,z/18)*0.8 + Math.pow(ridge,3)*10*Math.max(0,big+0.2);
+}
+function forestDensity(x,z){return smooth(-0.3,0.3,fbm(nF,x/230,z/230,2));}
+
+function mixTo(o,r,g,b,t){o[0]+=(r-o[0])*t;o[1]+=(g-o[1])*t;o[2]+=(b-o[2])*t;}
+function terrainColor(x,z,h,ny,o){
+  const v=nD(x/40,z/40)*0.5+0.5, v2=nD(x/9+300,z/9-200)*0.5+0.5;
+  o[0]=0.27+0.13*v; o[1]=0.39+0.07*v; o[2]=0.12+0.04*v;              // 풀
+  mixTo(o,0.34,0.29,0.18,Math.min(1,forestDensity(x,z)*(0.5+0.6*v2)*0.75)); // 숲 바닥 낙엽
+  const sl=1-ny;
+  mixTo(o,0.37,0.29,0.19,smooth(0.13,0.30,sl));                      // 경사 → 흙
+  mixTo(o,0.42,0.40,0.37,smooth(0.33,0.50,sl));                      // 더 가파르면 바위
+  mixTo(o,0.33,0.29,0.21,smooth(WATER_Y+1.8,WATER_Y+0.4,h));         // 물가 진흙
+  o[0]*=1.18;o[1]*=1.18;o[2]*=1.18;
+}
+
+// 격자 높이 읽기 (메쉬 삼각형과 똑같이 계산해서 발이 땅에 정확히 붙음)
+function gridH(hs,gx,gz){
+  let i=Math.floor(gx),j=Math.floor(gz);
+  if(i<-1)i=-1;if(i>SEG)i=SEG;if(j<-1)j=-1;if(j>SEG)j=SEG;
+  const fx=gx-i,fz=gz-j,W=SEG+3;
+  const a=hs[(j+1)*W+i+1],b=hs[(j+1)*W+i+2],c=hs[(j+2)*W+i+1],d=hs[(j+2)*W+i+2];
+  return fx+fz<=1 ? a+(b-a)*fx+(c-a)*fz : d+(c-d)*(1-fx)+(b-d)*(1-fz);
+}
+function groundH(x,z){
+  const cx=Math.floor(x/CHUNK),cz=Math.floor(z/CHUNK),c=chunks.get(cx+','+cz);
+  if(c)return gridH(c.hs,(x-cx*CHUNK)/RES,(z-cz*CHUNK)/RES);
+  const ix=Math.floor(x/RES),iz=Math.floor(z/RES),fx=x/RES-ix,fz=z/RES-iz;
+  const a=vertH(ix,iz),b=vertH(ix+1,iz),c2=vertH(ix,iz+1),d=vertH(ix+1,iz+1);
+  return fx+fz<=1 ? a+(b-a)*fx+(c2-a)*fz : d+(c2-d)*(1-fx)+(b-d)*(1-fz);
+}
+
+// ================= 텍스처 (그림을 코드로 그림) =================
+function wrapDraw(size,fn){for(const dx of [-size,0,size])for(const dy of [-size,0,size])fn(dx,dy);}
+function makeGroundTex(){
+  const S=256,cv=document.createElement('canvas');cv.width=cv.height=S;const g=cv.getContext('2d'),r=mulberry32(11);
+  g.fillStyle='rgb(222,222,222)';g.fillRect(0,0,S,S);
+  for(let i=0;i<70;i++){const x=r()*S,y=r()*S,rad=10+r()*30,dark=r()<0.6,a=0.06+r()*0.08;
+    wrapDraw(S,(dx,dy)=>{const gr=g.createRadialGradient(x+dx,y+dy,0,x+dx,y+dy,rad);
+      gr.addColorStop(0,dark?`rgba(90,90,90,${a})`:`rgba(255,255,255,${a})`);gr.addColorStop(1,'rgba(128,128,128,0)');
+      g.fillStyle=gr;g.fillRect(x+dx-rad,y+dy-rad,rad*2,rad*2);});}
+  for(let i=0;i<2600;i++){const x=r()*S,y=r()*S,s=1+r()*2.2,v=Math.floor(120+r()*135);
+    g.fillStyle=`rgba(${v},${v},${v},0.55)`;wrapDraw(S,(dx,dy)=>g.fillRect(x+dx,y+dy,s,s));}
+  const t=new THREE.CanvasTexture(cv);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=8;return t;
+}
+function makeBarkTex(){
+  const cv=document.createElement('canvas');cv.width=128;cv.height=256;const g=cv.getContext('2d'),r=mulberry32(21);
+  g.fillStyle='rgb(150,150,150)';g.fillRect(0,0,128,256);
+  for(let i=0;i<420;i++){const x=r()*128,y=r()*256,len=20+r()*80,w=1+r()*3,v=Math.floor(60+r()*120);
+    g.fillStyle=`rgba(${v},${v},${v},0.55)`;
+    for(const dx of [-128,0,128])for(const dy of [-256,0,256])g.fillRect(x+dx,y+dy,w,len);}
+  const t=new THREE.CanvasTexture(cv);t.wrapS=t.wrapT=THREE.RepeatWrapping;return t;
+}
+function makeRockTex(){
+  const S=128,cv=document.createElement('canvas');cv.width=cv.height=S;const g=cv.getContext('2d'),r=mulberry32(31);
+  g.fillStyle='rgb(200,200,200)';g.fillRect(0,0,S,S);
+  for(let i=0;i<900;i++){const x=r()*S,y=r()*S,s=1+r()*3,v=Math.floor(110+r()*145);
+    g.fillStyle=`rgba(${v},${v},${v},0.6)`;wrapDraw(S,(dx,dy)=>g.fillRect(x+dx,y+dy,s,s));}
+  g.strokeStyle='rgba(70,70,70,0.5)';g.lineWidth=1;
+  for(let i=0;i<14;i++){let x=r()*S,y=r()*S;g.beginPath();g.moveTo(x,y);for(let k=0;k<5;k++){x+=(r()-0.5)*30;y+=(r()-0.5)*30;g.lineTo(x,y);}g.stroke();}
+  const t=new THREE.CanvasTexture(cv);t.wrapS=t.wrapT=THREE.RepeatWrapping;return t;
+}
+// 왼쪽 절반 = 넓은 잎 뭉치, 오른쪽 절반 = 침엽수 가지
+function makeLeafTex(){
+  const cv=document.createElement('canvas');cv.width=512;cv.height=256;const g=cv.getContext('2d'),r=mulberry32(77);
+  g.lineCap='round';
+  g.save();g.beginPath();g.rect(0,0,256,256);g.clip();
+  for(let i=0;i<6;i++){const a=r()*6.283;g.strokeStyle='rgb(85,65,40)';g.lineWidth=2+r()*2;g.beginPath();g.moveTo(128,128);
+    g.quadraticCurveTo(128+Math.cos(a)*50+(r()-0.5)*30,128+Math.sin(a)*50,128+Math.cos(a)*105,128+Math.sin(a)*105);g.stroke();}
+  for(let i=0;i<120;i++){
+    const a=r()*6.283,d=Math.sqrt(r())*100,x=128+Math.cos(a)*d,y=128+Math.sin(a)*d,L=11+r()*10,rot=r()*6.283,sh=r();
+    const R=Math.floor(95+sh*60),G=Math.floor(150+sh*70),B=Math.floor(55+sh*35);
+    g.save();g.translate(x,y);g.rotate(rot);
+    g.fillStyle=`rgb(${R},${G},${B})`;g.beginPath();g.moveTo(-L,0);g.quadraticCurveTo(0,-L*0.55,L,0);g.quadraticCurveTo(0,L*0.55,-L,0);g.fill();
+    g.strokeStyle=`rgba(${R-40},${G-50},${B-20},0.8)`;g.lineWidth=1;g.beginPath();g.moveTo(-L,0);g.lineTo(L*0.9,0);g.stroke();
+    g.restore();
+  }
+  g.restore();
+  g.save();g.beginPath();g.rect(256,0,256,256);g.clip();
+  const stem=(x0,y0,ang,len,w,depth)=>{
+    const x1=x0+Math.cos(ang)*len,y1=y0+Math.sin(ang)*len;
+    g.strokeStyle='rgb(90,70,45)';g.lineWidth=w;g.beginPath();g.moveTo(x0,y0);g.lineTo(x1,y1);g.stroke();
+    const n=Math.floor(len/3);
+    for(let k=0;k<n;k++){const t=k/n,px=x0+(x1-x0)*t,py=y0+(y1-y0)*t,nl=(9+r()*6)*(1-t*0.5);
+      for(const sg of [-1,1]){const na=ang+sg*(0.9+r()*0.3),sh=r();
+        g.strokeStyle=`rgb(${60+sh*35|0},${115+sh*45|0},${55+sh*25|0})`;g.lineWidth=1.6;
+        g.beginPath();g.moveTo(px,py);g.lineTo(px+Math.cos(na)*nl,py+Math.sin(na)*nl);g.stroke();}}
+    if(depth>0)for(let k=1;k<=4;k++){const t=k/5,px=x0+(x1-x0)*t,py=y0+(y1-y0)*t;
+      for(const sg of [-1,1])stem(px,py,ang+sg*(0.55+r()*0.25),len*(0.42-t*0.2),w*0.6,depth-1);}
+  };
+  stem(262,128,0,236,3,1);
+  g.restore();
+  const t=new THREE.CanvasTexture(cv);t.anisotropy=4;return t;
+}
+
+// ================= 렌더러, 장면, 빛 =================
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));
+renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(72,innerWidth/innerHeight,0.1,700);
+camera.rotation.order='YXZ';
+const FOG_NEAR=40,FOG_FAR=VIEW_R*CHUNK-12;
+scene.fog=new THREE.Fog(0xb4cfe3,FOG_NEAR,FOG_FAR);
+
+const hemi=new THREE.HemisphereLight(0xc4d8ee,0x4d4330,0.5);scene.add(hemi);
+const sun=new THREE.DirectionalLight(0xffffff,1);
+sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);
+{const c=sun.shadow.camera;c.left=-55;c.right=55;c.top=55;c.bottom=-55;c.near=1;c.far=260;}
+sun.shadow.bias=-0.0004;sun.shadow.normalBias=0.04;
+scene.add(sun);scene.add(sun.target);
+
+// 하늘
+const skyU={top:{value:new THREE.Color()},horizon:{value:new THREE.Color()},sunDir:{value:new THREE.Vector3(0,1,0)},sunCol:{value:new THREE.Color(1,0.95,0.85)},sunVis:{value:1}};
+const sky=new THREE.Mesh(new THREE.SphereGeometry(500,32,16),new THREE.ShaderMaterial({
+  uniforms:skyU,side:THREE.BackSide,depthWrite:false,fog:false,
+  vertexShader:'varying vec3 vDir;void main(){vDir=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+  fragmentShader:`uniform vec3 top,horizon,sunCol,sunDir;uniform float sunVis;varying vec3 vDir;
+    void main(){vec3 d=normalize(vDir);float h=d.y;
+      vec3 c=h>0.0?mix(horizon,top,pow(h,0.55)):mix(horizon,horizon*0.55,min(1.0,-h*4.0));
+      float s=max(dot(d,normalize(sunDir)),0.0);
+      c+=sunCol*(pow(s,900.0)*2.0+pow(s,10.0)*0.22)*sunVis;
+      gl_FragColor=vec4(c,1.0);}`
+}));
+sky.renderOrder=-2;scene.add(sky);
+const stars=(()=>{const n=1400,a=new Float32Array(n*3),r=mulberry32(5);
+  for(let i=0;i<n;i++){const z=r()*1.1-0.1,ang=r()*6.283,s=Math.sqrt(1-z*z);a[i*3]=s*Math.cos(ang)*450;a[i*3+1]=z*450;a[i*3+2]=s*Math.sin(ang)*450;}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(a,3));
+  const p=new THREE.Points(g,new THREE.PointsMaterial({color:0xffffff,size:1.6,sizeAttenuation:false,transparent:true,opacity:0,fog:false,depthWrite:false}));
+  p.renderOrder=-1;scene.add(p);return p;})();
+const moon=new THREE.Mesh(new THREE.CircleGeometry(11,24),new THREE.MeshBasicMaterial({color:0xe2e8f5,fog:false,transparent:true,depthWrite:false}));
+moon.renderOrder=-1;scene.add(moon);
+
+// 물
+const water=new THREE.Mesh(new THREE.PlaneGeometry(900,900),new THREE.MeshPhongMaterial({color:0x2b5866,specular:0x8899aa,shininess:90,transparent:true,opacity:0.82,side:THREE.DoubleSide}));
+water.rotation.x=-Math.PI/2;water.position.y=WATER_Y;water.receiveShadow=true;scene.add(water);
+
+// ================= 재질 =================
+// 양면 잎·풀의 뒷면이 까맣게 보이지 않도록 앞면 빛을 그대로 씀
+function frontLit(mat,extra){mat.onBeforeCompile=sh=>{
+  sh.fragmentShader=sh.fragmentShader
+    .replace(/\( gl_FrontFacing \) \? vLightFront : vLightBack/g,'vLightFront')
+    .replace(/\( gl_FrontFacing \) \? vIndirectFront : vIndirectBack/g,'vIndirectFront');
+  if(extra)extra(sh);};}
+const groundTex=makeGroundTex(),barkTex=makeBarkTex(),rockTex=makeRockTex(),leafTex=makeLeafTex();
+const terrainMat=new THREE.MeshLambertMaterial({vertexColors:true,map:groundTex});
+const barkMat=new THREE.MeshLambertMaterial({vertexColors:true,map:barkTex});
+const rockMat=new THREE.MeshLambertMaterial({vertexColors:true,map:rockTex});
+const leafMat=new THREE.MeshLambertMaterial({vertexColors:true,map:leafTex,alphaTest:0.5,side:THREE.DoubleSide});
+frontLit(leafMat);
+const leafDepthMat=new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking,map:leafTex,alphaTest:0.5,side:THREE.DoubleSide});
+const windU={value:0};
+const grassMat=new THREE.MeshLambertMaterial({vertexColors:true,side:THREE.DoubleSide});
+frontLit(grassMat,sh=>{
+  sh.uniforms.uTime=windU;
+  sh.vertexShader='uniform float uTime;\n'+sh.vertexShader.replace('#include <begin_vertex>',`
+    vec3 transformed=vec3(position);
+    #ifdef USE_INSTANCING
+      vec2 wp=vec2(instanceMatrix[3][0],instanceMatrix[3][2]);
+    #else
+      vec2 wp=vec2(0.0);
+    #endif
+    float k=position.y*position.y;
+    float w=sin(uTime*1.6+wp.x*0.35+wp.y*0.22)*0.6+sin(uTime*2.9+wp.x*0.9-wp.y*0.4)*0.25;
+    transformed.x+=w*k*0.45;transformed.z+=w*k*0.2;`);
+});
+
+// ================= 모양 만들기 도우미 =================
+class GB{
+  constructor(){this.p=[];this.n=[];this.u=[];this.c=[];}
+  v(px,py,pz,nx,ny,nz,u,w,col){this.p.push(px,py,pz);this.n.push(nx,ny,nz);this.u.push(u,w);this.c.push(col[0],col[1],col[2]);}
+  vp(p,n,u,w,col){this.v(p.x,p.y,p.z,n.x,n.y,n.z,u,w,col);}
+  get empty(){return this.p.length===0;}
+  build(){const g=new THREE.BufferGeometry();
+    g.setAttribute('position',new THREE.Float32BufferAttribute(this.p,3));
+    g.setAttribute('normal',new THREE.Float32BufferAttribute(this.n,3));
+    g.setAttribute('uv',new THREE.Float32BufferAttribute(this.u,2));
+    g.setAttribute('color',new THREE.Float32BufferAttribute(this.c,3));
+    g.computeBoundingSphere();return g;}
+}
+function addCyl(gb,a,b,r0,r1,sides,col,v0){
+  const Y=b.clone().sub(a),len=Y.length();Y.divideScalar(len);
+  const t=Math.abs(Y.y)<0.9?V(0,1,0):V(1,0,0);
+  const X=t.clone().cross(Y).normalize(),Z=X.clone().cross(Y);
+  const v1=v0+len/1.6;
+  for(let k=0;k<sides;k++){
+    const a0=k/sides*6.2832,a1=(k+1)/sides*6.2832;
+    const d0=X.clone().multiplyScalar(Math.cos(a0)).addScaledVector(Z,Math.sin(a0));
+    const d1=X.clone().multiplyScalar(Math.cos(a1)).addScaledVector(Z,Math.sin(a1));
+    const B0=a.clone().addScaledVector(d0,r0),B1=a.clone().addScaledVector(d1,r0);
+    const T0=b.clone().addScaledVector(d0,r1),T1=b.clone().addScaledVector(d1,r1);
+    const u0=k/sides*2,u1=(k+1)/sides*2;
+    gb.vp(B0,d0,u0,v0,col);gb.vp(T0,d0,u0,v1,col);gb.vp(B1,d1,u1,v0,col);
+    gb.vp(B1,d1,u1,v0,col);gb.vp(T0,d0,u0,v1,col);gb.vp(T1,d1,u1,v1,col);
+  }
+  return v1;
+}
+function addCard(gb,c,R,U,n,u0,u1,col){
+  const p0=c.clone().sub(R).sub(U),p1=c.clone().add(R).sub(U),p2=c.clone().add(R).add(U),p3=c.clone().sub(R).add(U);
+  gb.vp(p0,n,u0,0,col);gb.vp(p1,n,u1,0,col);gb.vp(p2,n,u1,1,col);
+  gb.vp(p0,n,u0,0,col);gb.vp(p2,n,u1,1,col);gb.vp(p3,n,u0,1,col);
+}
+function randDir(r){const z=r()*2-1,a=r()*6.2832,s=Math.sqrt(1-z*z);return V(s*Math.cos(a),z,s*Math.sin(a));}
+
+// 활엽수 (참나무 느낌 / 자작나무)
+function makeBroadleaf(tg,lg,x,y,z,r,birch){
+  const H=birch?7+r()*4:6+r()*5.5,R0=birch?0.14+r()*0.06:0.22+r()*0.16;
+  const bark=birch?[1.35,1.32,1.25]:[0.62+r()*0.1,0.52+r()*0.06,0.42];
+  const lean=[(r()-0.5)*0.6,(r()-0.5)*0.6],segs=4,trunkH=H*0.72;
+  let p=V(x,y-0.4,z),rad=R0*1.2,vAcc=0;const pts=[p.clone()];
+  for(let s=1;s<=segs;s++){const t=s/segs;
+    const q=V(x+lean[0]*t*t*2+(r()-0.5)*0.15,y+trunkH*t,z+lean[1]*t*t*2+(r()-0.5)*0.15),nr=R0*(1-0.5*t);
+    vAcc=addCyl(tg,p,q,rad,nr,8,bark,vAcc);p=q;rad=nr;pts.push(q.clone());}
+  const CR=H*0.3+0.4,crown=V(p.x,y+H*0.74,p.z),clusters=[V(p.x,p.y+CR*0.35,p.z)];
+  const nb=4+Math.floor(r()*3);
+  for(let b=0;b<nb;b++){
+    const t=0.45+r()*0.45,si=Math.min(segs-1,Math.floor(t*segs)),st=pts[si].clone().lerp(pts[si+1],t*segs-si);
+    const a=b/nb*6.2832+r()*0.8,dir=V(Math.cos(a),0.55+r()*0.6,Math.sin(a)).normalize();
+    const en=st.clone().addScaledVector(dir,CR*(0.75+r()*0.35));
+    addCyl(tg,st,en,R0*0.38,R0*0.1,5,bark,0);clusters.push(en);
+  }
+  const lc=birch?[0.95,1.05,0.72]:[0.72+r()*0.15,0.82+r()*0.15,0.68];
+  for(const k of clusters){const cr=CR*(0.5+r()*0.25);
+    for(let i=0;i<10;i++){
+      const d=randDir(r),c=k.clone().addScaledVector(d,cr*Math.cbrt(r()));
+      const out=c.clone().sub(crown);out.y+=CR*0.6;out.normalize();
+      const sz=0.85+r()*0.6,pn=randDir(r),tt=Math.abs(pn.y)<0.9?V(0,1,0):V(1,0,0);
+      const Rv=tt.clone().cross(pn).normalize().multiplyScalar(sz),Uv=pn.clone().cross(Rv).normalize().multiplyScalar(sz);
+      const sh=0.72+0.3*Math.max(0,d.dot(out))+(r()-0.5)*0.12;
+      addCard(lg,c,Rv,Uv,out,0,0.5,[lc[0]*sh,lc[1]*sh,lc[2]*sh]);
+    }}
+  return {rad:R0*1.1,clusters,CR};
+}
+// 침엽수 (소나무·전나무 느낌)
+function makeConifer(tg,lg,x,y,z,r){
+  const H=9+r()*8,R0=0.2+r()*0.12,bark=[0.58,0.47,0.4];
+  const v=addCyl(tg,V(x,y-0.4,z),V(x,y+H*0.5,z),R0*1.15,R0*0.6,8,bark,0);
+  addCyl(tg,V(x,y+H*0.5,z),V(x,y+H,z),R0*0.6,0.03,6,bark,v);
+  const base=H*(0.18+r()*0.12),top=H+0.3,W=H*0.2+0.8,tint=[0.62+r()*0.1,0.72+r()*0.12,0.62];
+  for(let ty=base;ty<top;ty+=0.7){
+    const f=(ty-base)/(top-base),rad=(1-f)*W+0.25,n=Math.max(3,Math.round(rad*3.5));
+    for(let k=0;k<n;k++){
+      const a=k/n*6.2832+r()*0.6+ty*1.3,dx=Math.cos(a),dz=Math.sin(a);
+      const L=rad*(0.5+r()*0.15),droop=-0.25-r()*0.25;
+      const c=V(x+dx*L,y+ty+droop*L*0.5,z+dz*L);
+      const Rv=V(dx,droop,dz).normalize().multiplyScalar(L);
+      const Uv=V(-dz,0.15,dx).normalize().multiplyScalar(Math.max(0.35,L*0.45));
+      const sh=0.75+0.35*f+(r()-0.5)*0.15;
+      addCard(lg,c,Rv,Uv,V(dx,0.9,dz).normalize(),0.5,1,[tint[0]*sh,tint[1]*sh,tint[2]*sh]);
+    }
+  }
+  return {rad:R0*1.15};
+}
+// 바위
+const ICO=new THREE.IcosahedronGeometry(1,1).attributes.position.array;
+function addRock(gb,x,y,z,s,r){
+  const sx=s*(0.8+r()*0.5),sy=s*(0.45+r()*0.35),sz=s*(0.8+r()*0.5),rot=r()*6.2832,k=r()*100,cr=Math.cos(rot),sr=Math.sin(rot),tone=0.85+r()*0.25;
+  const pts=[];
+  for(let i=0;i<ICO.length;i+=3){const vx=ICO[i],vy=ICO[i+1],vz=ICO[i+2];
+    const d=1+0.3*nD(vx*1.4+k,vz*1.4+vy*1.9)+0.1*nD(vx*4+k,vy*4-vz*3);
+    const px=vx*d*sx,py=vy*d*sy,pz=vz*d*sz;pts.push(x+px*cr-pz*sr,y+py,z+px*sr+pz*cr);}
+  const col=[0,0,0];
+  for(let i=0;i<pts.length;i+=9){
+    const ax=pts[i+3]-pts[i],ay=pts[i+4]-pts[i+1],az=pts[i+5]-pts[i+2],bx=pts[i+6]-pts[i],by=pts[i+7]-pts[i+1],bz=pts[i+8]-pts[i+2];
+    let nx=ay*bz-az*by,ny=az*bx-ax*bz,nz=ax*by-ay*bx;const l=Math.hypot(nx,ny,nz)||1;nx/=l;ny/=l;nz/=l;
+    col[0]=0.5*tone;col[1]=0.49*tone;col[2]=0.47*tone;mixTo(col,0.32,0.42,0.18,smooth(0.55,0.85,ny)*0.8);
+    for(let j=0;j<3;j++){const px=pts[i+j*3],py=pts[i+j*3+1],pz=pts[i+j*3+2];gb.v(px,py,pz,nx,ny,nz,(px+pz)*0.35,py*0.35,col);}
+  }
+}
+// 풀 한 포기 (잎 5장)
+const grassGeo=(()=>{
+  const gb=new GB(),r=mulberry32(5),base=[0.18,0.30,0.09],tip=[0.44,0.60,0.21];
+  for(let b=0;b<5;b++){
+    const ox=(r()-0.5)*0.35,oz=(r()-0.5)*0.35,a=r()*6.2832,h=0.35+r()*0.4,w=0.035+r()*0.02,bend=0.1+r()*0.2;
+    const cx=Math.cos(a),sz=Math.sin(a),fx=-sz,fz=cx;
+    const loc=[[-w,0,0],[w,0,0],[-w*0.7,h*0.55,bend*0.35],[w*0.7,h*0.55,bend*0.35],[0,h,bend]];
+    const P=loc.map(([s,y,f])=>[ox+s*cx+f*fx,y,oz+s*sz+f*fz]);
+    const C=loc.map(([,y])=>{const t=y/h;return [base[0]+(tip[0]-base[0])*t,base[1]+(tip[1]-base[1])*t,base[2]+(tip[2]-base[2])*t];});
+    for(const [i,j,k] of [[0,1,2],[1,3,2],[2,3,4]])for(const q of [i,j,k])gb.v(P[q][0],P[q][1],P[q][2],0,1,0,0,0,C[q]);
+  }
+  return gb.build();
+})();
+
+// ================= 아이템 =================
+function drawIcon(draw){const c=document.createElement('canvas');c.width=c.height=64;const g=c.getContext('2d');draw(g);return c.toDataURL();}
+function line(g,x0,y0,x1,y1){g.beginPath();g.moveTo(x0,y0);g.lineTo(x1,y1);g.stroke();}
+const ITEMS={
+  stick:{name:'막대기',w:0.4,stack:20,icon:drawIcon(g=>{
+    g.lineCap='round';
+    g.strokeStyle='#3e2b1a';g.lineWidth=10;line(g,10,55,54,9);line(g,33,32,47,40);
+    g.strokeStyle='#8a6440';g.lineWidth=6;line(g,10,55,54,9);g.lineWidth=4;line(g,33,32,47,40);
+    g.strokeStyle='#b08a60';g.lineWidth=2;line(g,14,49,48,14);})},
+  pebble:{name:'조약돌',w:0.3,stack:20,icon:drawIcon(g=>{
+    const gr=g.createRadialGradient(26,26,4,32,34,26);gr.addColorStop(0,'#c9c6bf');gr.addColorStop(0.7,'#8c8982');gr.addColorStop(1,'#55534f');
+    g.fillStyle=gr;g.beginPath();g.ellipse(32,36,24,17,-0.2,0,Math.PI*2);g.fill();
+    g.fillStyle='rgba(255,255,255,.25)';g.beginPath();g.ellipse(25,29,8,4,-0.4,0,Math.PI*2);g.fill();})},
+};
+Object.assign(ITEMS,{
+  log:{name:'통나무',w:3,stack:8,icon:drawIcon(g=>{
+    g.fillStyle='#5a4028';g.fillRect(8,22,40,22);g.fillStyle='#7a5838';g.fillRect(8,24,40,6);
+    g.fillStyle='#c9a46e';g.beginPath();g.ellipse(48,33,9,11,0,0,Math.PI*2);g.fill();
+    g.strokeStyle='#8a6a40';g.lineWidth=1.5;g.beginPath();g.ellipse(48,33,5,6.5,0,0,Math.PI*2);g.stroke();})},
+  apple:{name:'사과',w:0.2,stack:20,icon:drawIcon(g=>{
+    const gr=g.createRadialGradient(26,30,3,32,36,22);gr.addColorStop(0,'#ff6a4a');gr.addColorStop(1,'#8f1410');
+    g.fillStyle=gr;g.beginPath();g.arc(32,37,19,0,Math.PI*2);g.fill();
+    g.strokeStyle='#4a3020';g.lineWidth=3;line(g,32,20,35,10);g.fillStyle='#4f8a2a';g.beginPath();g.ellipse(42,14,8,4,-0.4,0,Math.PI*2);g.fill();})},
+  blueberry:{name:'블루베리',w:0.01,stack:50,icon:drawIcon(g=>{
+    for(const [x,y,r] of [[24,38,11],[40,40,11],[32,24,11]]){const gr=g.createRadialGradient(x-3,y-3,1,x,y,r);gr.addColorStop(0,'#6a78c0');gr.addColorStop(1,'#1c2250');
+      g.fillStyle=gr;g.beginPath();g.arc(x,y,r,0,Math.PI*2);g.fill();g.fillStyle='#141830';g.beginPath();g.arc(x,y-r+3,2,0,Math.PI*2);g.fill();}})},
+  mushroom_brown:{name:'갈색 버섯',w:0.05,stack:20,icon:drawIcon(g=>{
+    g.fillStyle='#e8e0cc';g.fillRect(27,30,10,24);g.fillStyle='#8a5a32';g.beginPath();g.ellipse(32,30,22,13,0,Math.PI,0);g.fill();})},
+  mushroom_red:{name:'빨간 버섯',w:0.05,stack:20,icon:drawIcon(g=>{
+    g.fillStyle='#eee8d8';g.fillRect(27,30,10,24);g.fillStyle='#c4231c';g.beginPath();g.ellipse(32,30,22,14,0,Math.PI,0);g.fill();
+    g.fillStyle='#fff';for(const [x,y] of [[24,24],[36,21],[42,27],[30,28]]){g.beginPath();g.arc(x,y,2.5,0,Math.PI*2);g.fill();}})},
+  stone_axe:{name:'돌도끼',w:1.2,stack:1,dur:80,icon:drawIcon(g=>{
+    g.lineCap='round';g.strokeStyle='#5a3e24';g.lineWidth=7;line(g,16,56,44,12);
+    g.fillStyle='#8d8a84';g.beginPath();g.moveTo(34,10);g.lineTo(56,6);g.lineTo(58,28);g.lineTo(40,24);g.closePath();g.fill();
+    g.strokeStyle='#a68a5a';g.lineWidth=3;line(g,36,14,44,22);})},
+});
+// ---- 블록 그림 모음 (4×4 칸) ----
+const ATLAS=(()=>{
+  const T=64,cv=document.createElement('canvas');cv.width=cv.height=T*4;const g=cv.getContext('2d'),r=mulberry32(91);
+  const at=i=>[(i%4)*T,Math.floor(i/4)*T];
+  const noiseFill=(i,base,vary)=>{const [x0,y0]=at(i);
+    for(let y=0;y<T;y+=2)for(let x=0;x<T;x+=2){const v=(r()-0.5)*vary;g.fillStyle=`rgb(${base[0]+v|0},${base[1]+v|0},${base[2]+v|0})`;g.fillRect(x0+x,y0+y,2,2);}};
+  const stone=i=>{noiseFill(i,[128,126,122],34);const [x0,y0]=at(i);g.strokeStyle='rgba(60,60,60,.45)';g.lineWidth=1;
+    for(let k=0;k<5;k++){let x=x0+r()*T,y=y0+r()*T;g.beginPath();g.moveTo(x,y);
+      for(let s=0;s<3;s++){x=Math.min(x0+T,Math.max(x0,x+(r()-.5)*24));y=Math.min(y0+T,Math.max(y0,y+(r()-.5)*24));g.lineTo(x,y);}g.stroke();}};
+  const ore=(i,cols)=>{stone(i);const [x0,y0]=at(i);
+    for(let k=0;k<9;k++){const cx=x0+8+r()*(T-16),cy=y0+8+r()*(T-16);
+      for(let s=0;s<5;s++){g.fillStyle=cols[s%cols.length];const w=3+r()*5;g.fillRect(cx+(r()-.5)*9,cy+(r()-.5)*9,w,w*0.8);}}};
+  stone(0);
+  ore(1,['#c8743a','#d9925a','#3e9a6a']);
+  ore(2,['#dcdcd4','#b8b8b0','#f0f0ea']);
+  ore(3,['#b0603a','#c47a50','#8a4a2a']);
+  ore(4,['#1e1e1e','#2c2c2c','#111111']);
+  ore(5,['#b04a30','#d8c8a0','#c06040']);
+  {const [x0,y0]=at(6);                                         // 판자
+    for(let b=0;b<4;b++){const v=(r()-.5)*20;g.fillStyle=`rgb(${150+v|0},${110+v|0},${70+v|0})`;g.fillRect(x0,y0+b*16,T,16);
+      g.strokeStyle='rgba(90,60,30,.5)';g.lineWidth=1;for(let k=0;k<4;k++){const yy=y0+b*16+3+r()*10;g.beginPath();g.moveTo(x0,yy);g.lineTo(x0+T,yy+(r()-.5)*2);g.stroke();}
+      g.fillStyle='rgba(50,30,15,.8)';g.fillRect(x0,y0+b*16+15,T,1);g.fillRect(x0+(b%2?20:44),y0+b*16,1,16);}}
+  {const [x0,y0]=at(7);g.fillStyle='#6a6660';g.fillRect(x0,y0,T,T);   // 돌 벽돌
+    for(let row=0;row<4;row++)for(let col=-1;col<2;col++){const v=(r()-.5)*24,xx=x0+col*32+(row%2?16:0)+1;
+      g.fillStyle=`rgb(${150+v|0},${146+v|0},${138+v|0})`;g.fillRect(Math.max(x0,xx),y0+row*16+1,Math.min(30,x0+T-Math.max(x0,xx)),14);}}
+  noiseFill(8,[110,80,52],30);                                   // 흙
+  {const [x0,y0]=at(9);g.clearRect(x0,y0,T,T);                   // 지지대 (가운데가 뚫림)
+    g.fillStyle='#8a6440';g.fillRect(x0,y0,T,8);g.fillRect(x0,y0+T-8,T,8);g.fillRect(x0,y0,8,T);g.fillRect(x0+T-8,y0,8,T);
+    g.strokeStyle='#7a5636';g.lineWidth=7;g.beginPath();g.moveTo(x0+6,y0+T-6);g.lineTo(x0+T-6,y0+6);g.stroke();}
+  const front=(i,dark)=>{const [x0,y0]=at(i),b0=dark?90:120;g.fillStyle=dark?'#3a3634':'#5a5652';g.fillRect(x0,y0,T,T);
+    for(let row=0;row<4;row++)for(let col=0;col<3;col++){const v=(r()-.5)*20;g.fillStyle=`rgb(${b0+v|0},${b0-4+v|0},${b0-10+v|0})`;g.fillRect(x0+col*22+(row%2?3:0)+1,y0+row*16+1,18,14);}
+    g.fillStyle='#120c08';g.fillRect(x0+18,y0+30,28,22);
+    const gr=g.createLinearGradient(0,y0+52,0,y0+36);gr.addColorStop(0,'#ff9a2a');gr.addColorStop(1,'rgba(255,80,0,0)');g.fillStyle=gr;g.fillRect(x0+20,y0+36,24,16);
+    if(dark){g.fillStyle='#777';g.fillRect(x0,y0+10,T,4);g.fillRect(x0,y0+T-14,T,4);}};
+  front(10,false);front(11,true);
+  const top=(i,dark)=>{const [x0,y0]=at(i);noiseFill(i,dark?[80,78,76]:[110,106,100],20);g.fillStyle='#1a1410';g.fillRect(x0+22,y0+22,20,20);};
+  top(12,false);top(13,true);
+  const t=new THREE.CanvasTexture(cv);t.magFilter=THREE.NearestFilter;t.anisotropy=4;return {tex:t,cv};
+})();
+function tileUV(t){const e=0.004;return [(t%4)/4+e,1-(Math.floor(t/4)+1)/4+e,(t%4+1)/4-e,1-Math.floor(t/4)/4-e];}
+// 블록 번호 → 정보 (hard: 단단함, tool: 필요한 도구, tier: 1 돌·2 청동·3 철, natural: 저절로 생긴 바위)
+const BLOCKS={
+  1:{name:'돌',item:'stone',hard:4,tool:'pick',tier:1,tile:0,natural:true},
+  2:{name:'구리 광맥',item:'copper_ore',hard:5,tool:'pick',tier:1,tile:1,natural:true},
+  3:{name:'주석 광맥',item:'tin_ore',hard:5,tool:'pick',tier:1,tile:2,natural:true},
+  4:{name:'철 광맥',item:'iron_ore',hard:6,tool:'pick',tier:2,tile:3,natural:true},
+  5:{name:'석탄 광맥',item:'coal',hard:4,tool:'pick',tier:1,tile:4,natural:true},
+  6:{name:'알루미늄 광맥',item:'bauxite',hard:7,tool:'pick',tier:3,tile:5,natural:true},
+  7:{name:'판자 블록',item:'plank_block',hard:3,tool:'axe',tier:1,tile:6},
+  8:{name:'돌 벽돌',item:'brick',hard:5,tool:'pick',tier:1,tile:7},
+  9:{name:'흙 블록',item:'dirt',hard:2,tool:'shovel',tier:1,tile:8},
+  10:{name:'지지대',item:'support',hard:3,tool:'axe',tier:1,tile:9,see:true},
+  11:{name:'화로',item:'furnace',hard:5,tool:'pick',tier:1,tile:10,top:12},
+  12:{name:'용광로',item:'blast',hard:6,tool:'pick',tier:1,tile:11,top:13},
+};
+const voxMat=new THREE.MeshLambertMaterial({map:ATLAS.tex,vertexColors:true,alphaTest:0.5,side:THREE.DoubleSide});
+frontLit(voxMat);
+const _bgc={};
+function blockGeo(b,s){
+  const k=b+'_'+s;if(_bgc[k])return _bgc[k];
+  const g=new THREE.BoxGeometry(s,s,s),uv=g.attributes.uv,B=BLOCKS[b];
+  for(let f=0;f<6;f++){const tile=(f===2||f===3)&&B.top!==undefined?B.top:B.tile,[u0,v0,u1,v1]=tileUV(tile);
+    for(let i=0;i<4;i++){const j=f*4+i;uv.setXY(j,u0+uv.getX(j)*(u1-u0),v0+uv.getY(j)*(v1-v0));}}
+  g.setAttribute('color',new THREE.Float32BufferAttribute(new Array(g.attributes.position.count*3).fill(1),3));
+  return _bgc[k]=g;
+}
+
+// ---- 아이콘 도우미 ----
+function iconLump(base,specks){return drawIcon(g=>{
+  const gr=g.createRadialGradient(26,28,4,32,34,26);gr.addColorStop(0,base[0]);gr.addColorStop(1,base[1]);
+  g.fillStyle=gr;g.beginPath();g.moveTo(10,38);g.lineTo(18,16);g.lineTo(40,10);g.lineTo(56,26);g.lineTo(52,50);g.lineTo(26,56);g.closePath();g.fill();
+  const r=mulberry32(base[0].charCodeAt(1)*7+specks.length);
+  for(let i=0;i<14;i++){g.fillStyle=specks[i%specks.length];g.fillRect(16+r()*30,18+r()*28,4+r()*4,3+r()*3);}});}
+function iconIngot(c1,c2){return drawIcon(g=>{
+  g.fillStyle=c2;g.beginPath();g.moveTo(8,44);g.lineTo(56,44);g.lineTo(48,54);g.lineTo(16,54);g.closePath();g.fill();
+  const gr=g.createLinearGradient(0,24,0,46);gr.addColorStop(0,c1);gr.addColorStop(1,c2);
+  g.fillStyle=gr;g.beginPath();g.moveTo(16,24);g.lineTo(48,24);g.lineTo(56,44);g.lineTo(8,44);g.closePath();g.fill();
+  g.fillStyle='rgba(255,255,255,.35)';g.fillRect(18,27,26,3);});}
+function iconTile(tile){return drawIcon(g=>{g.drawImage(ATLAS.cv,(tile%4)*64,Math.floor(tile/4)*64,64,64,6,6,52,52);g.strokeStyle='rgba(0,0,0,.5)';g.lineWidth=2;g.strokeRect(6,6,52,52);});}
+const TIER_COL={1:'#8d8a84',2:'#c58a3c',3:'#b9bec5'};
+function drawToolShape(g,kind,head,handle){
+  g.lineCap='round';g.strokeStyle=handle;g.lineWidth=6;
+  if(kind==='spear'){line(g,8,58,50,16);g.fillStyle=head;g.beginPath();g.moveTo(44,12);g.lineTo(60,4);g.lineTo(52,22);g.closePath();g.fill();return;}
+  if(kind==='sword'){line(g,10,56,20,46);g.strokeStyle='#555';g.lineWidth=5;line(g,12,38,28,54);g.strokeStyle=head;g.lineWidth=7;line(g,22,42,54,10);
+    g.strokeStyle='rgba(255,255,255,.4)';g.lineWidth=2;line(g,24,40,52,12);return;}
+  line(g,14,56,44,14);g.fillStyle=head;
+  if(kind==='axe'){g.beginPath();g.moveTo(36,12);g.lineTo(56,6);g.lineTo(58,28);g.lineTo(40,24);g.closePath();g.fill();}
+  else if(kind==='pick'){g.strokeStyle=head;g.lineWidth=7;g.beginPath();g.moveTo(20,10);g.quadraticCurveTo(44,4,58,26);g.stroke();}
+  else if(kind==='shovel'){g.beginPath();g.ellipse(50,10,9,12,0.6,0,Math.PI*2);g.fill();}
+}
+function iconTool(kind,tier){return drawIcon(g=>drawToolShape(g,kind,TIER_COL[tier],'#6a4a2a'));}
+function iconMold(kind){return drawIcon(g=>{g.fillStyle='#7d7a74';g.fillRect(6,10,52,44);g.fillStyle='#9a968e';g.fillRect(6,10,52,6);
+  g.save();g.translate(10,12);g.scale(0.68,0.68);drawToolShape(g,kind,'#2e2c2a','#4a4744');g.restore();});}
+
+// ---- 새 아이템 ----
+const TOOL_NAME={axe:'도끼',pick:'곡괭이',shovel:'삽',sword:'검',spear:'창'};
+const TIER_NAME={1:'돌',2:'청동',3:'철'};
+const TIER_DUR={1:80,2:220,3:450},TIER_POW={1:1,2:1.6,3:2.3},TOOL_DMG={axe:4,pick:3,shovel:2,sword:7,spear:6};
+Object.assign(ITEMS,{
+  fiber:{name:'풀 줄기',w:0.02,stack:50,icon:drawIcon(g=>{g.lineCap='round';
+    for(let i=0;i<7;i++){g.strokeStyle=['#6a9a3a','#8ab04a','#5a8030'][i%3];g.lineWidth=3;g.beginPath();g.moveTo(14+i*5,58);g.quadraticCurveTo(20+i*4,30,30+i*4-(i%2)*8,6);g.stroke();}})},
+  cord:{name:'끈',w:0.05,stack:30,icon:drawIcon(g=>{g.strokeStyle='#a08a50';g.lineWidth=4;
+    for(let i=0;i<4;i++){g.beginPath();g.ellipse(32,32,22-i*4,14-i*2,0.3,0,Math.PI*2);g.stroke();}g.strokeStyle='#7a6438';g.lineWidth=3;line(g,46,40,58,56);})},
+  plank:{name:'판자',w:0.5,stack:30,icon:drawIcon(g=>{g.fillStyle='#b4844e';g.fillRect(6,24,52,16);g.strokeStyle='#8a6034';g.lineWidth=1.5;line(g,8,29,56,30);line(g,8,35,56,34);g.fillStyle='#6a4626';g.fillRect(6,39,52,2);})},
+  stone:{name:'돌',w:2,stack:20,place:1,icon:iconTile(0)},
+  dirt:{name:'흙',w:1.5,stack:20,place:9,icon:iconTile(8)},
+  copper_ore:{name:'구리 광석',w:1.5,stack:20,icon:iconLump(['#9a968e','#5a5752'],['#c8743a','#3e9a6a','#d9925a'])},
+  tin_ore:{name:'주석 광석',w:1.5,stack:20,icon:iconLump(['#9a968e','#5a5752'],['#e8e8e0','#c0c0b8'])},
+  iron_ore:{name:'철광석',w:1.8,stack:20,icon:iconLump(['#9a968e','#5a5752'],['#b0603a','#c47a50'])},
+  bauxite:{name:'알루미늄 광석',w:1.5,stack:20,icon:iconLump(['#c06a4a','#7a3a24'],['#e0d0a8','#d08060'])},
+  coal:{name:'석탄',w:0.8,stack:30,icon:iconLump(['#3a3a3a','#101010'],['#555555','#2a2a2a'])},
+  charcoal:{name:'숯',w:0.4,stack:30,icon:iconLump(['#4a4038','#141010'],['#6a5a48'])},
+  copper_ingot:{name:'구리 주괴',w:1,stack:20,icon:iconIngot('#f0a070','#a8582a')},
+  tin_ingot:{name:'주석 주괴',w:1,stack:20,icon:iconIngot('#f0f0ea','#9a9a94')},
+  bronze_ingot:{name:'청동 주괴',w:1,stack:20,icon:iconIngot('#e8b060','#8a5a20')},
+  iron_ingot:{name:'철 주괴',w:1.2,stack:20,icon:iconIngot('#e0e4ea','#6a6e74')},
+  alu_ingot:{name:'알루미늄 주괴',w:0.4,stack:20,icon:iconIngot('#f4f6fa','#a8b0ba')},
+  plank_block:{name:'판자 블록',w:2,stack:20,place:7,icon:iconTile(6)},
+  brick:{name:'돌 벽돌',w:2.5,stack:20,place:8,icon:iconTile(7)},
+  support:{name:'지지대',w:3,stack:10,place:10,icon:iconTile(9)},
+  furnace:{name:'화로',w:10,stack:4,place:11,icon:iconTile(10)},
+  blast:{name:'용광로',w:15,stack:2,place:12,icon:iconTile(11)},
+  torch:{name:'횃불',w:0.2,stack:30,torch:true,icon:drawIcon(g=>{g.fillStyle='#7a5636';g.fillRect(28,26,8,34);g.fillStyle='#222';g.fillRect(26,20,12,8);
+    const gr=g.createRadialGradient(32,14,1,32,16,14);gr.addColorStop(0,'#fff6b0');gr.addColorStop(0.5,'#ffa030');gr.addColorStop(1,'rgba(255,80,0,0)');
+    g.fillStyle=gr;g.beginPath();g.arc(32,14,14,0,Math.PI*2);g.fill();})},
+});
+Object.assign(ITEMS.stone_axe,{name:'돌 도끼',tool:'axe',tier:1,power:1,dmg:4,dur:TIER_DUR[1]});
+for(const kind of ['axe','pick','shovel','sword','spear']){
+  ITEMS['mold_'+kind]={name:TOOL_NAME[kind]+' 틀',w:3,stack:1,mold:kind,icon:iconMold(kind)};
+  for(const tier of [1,2,3]){
+    const id=['','stone','bronze','iron'][tier]+'_'+kind;
+    if(id==='stone_axe'||id==='stone_sword')continue;      // 돌 도끼는 위에 있고, 돌로는 검을 못 만듦
+    ITEMS[id]={name:TIER_NAME[tier]+' '+TOOL_NAME[kind],w:kind==='spear'?1.5:1+tier*0.2,stack:1,dur:TIER_DUR[tier],
+      tool:kind,tier,power:TIER_POW[tier],dmg:Math.round(TOOL_DMG[kind]*(1+(tier-1)*0.5)),icon:iconTool(kind,tier)};
+  }
+}
+
+// ---- 조합법 ----
+// shape: 모양대로 놓기 / need: 개수만 맞으면 됨 / keep: 다 만들어도 남는 것(틀)
+const RECIPES=[
+  {cat:'기본',out:'plank',n:4,shape:['L'],key:{L:'log'}},
+  {cat:'기본',out:'stick',n:4,shape:['P','P'],key:{P:'plank'}},
+  {cat:'기본',out:'cord',n:1,shape:['FFF'],key:{F:'fiber'}},
+  {cat:'기본',out:'torch',n:4,shape:['C','S'],key:{C:'coal',S:'stick'}},
+  {cat:'기본',out:'torch',n:4,shape:['C','S'],key:{C:'charcoal',S:'stick'}},
+  {cat:'돌 도구',out:'stone_axe',n:1,shape:['PP','PS',' S'],key:{P:'pebble',S:'stick'}},
+  {cat:'돌 도구',out:'stone_pick',n:1,shape:['PPP',' C ',' S ',' S '],key:{P:'pebble',C:'cord',S:'stick'}},
+  {cat:'돌 도구',out:'stone_shovel',n:1,shape:['P','C','S','S'],key:{P:'pebble',C:'cord',S:'stick'}},
+  {cat:'돌 도구',out:'stone_spear',n:1,shape:['   P','  C ',' S  ','S   '],key:{P:'pebble',C:'cord',S:'stick'}},
+  {cat:'틀 (돌을 조약돌로 갈아서)',out:'mold_axe',n:1,shape:['SS','SP'],key:{S:'stone',P:'pebble'}},
+  {cat:'틀 (돌을 조약돌로 갈아서)',out:'mold_pick',n:1,shape:['SSS','SPS'],key:{S:'stone',P:'pebble'}},
+  {cat:'틀 (돌을 조약돌로 갈아서)',out:'mold_shovel',n:1,shape:['SPS','SSS'],key:{S:'stone',P:'pebble'}},
+  {cat:'틀 (돌을 조약돌로 갈아서)',out:'mold_sword',n:1,shape:['SPS','SPS','SSS'],key:{S:'stone',P:'pebble'}},
+  {cat:'틀 (돌을 조약돌로 갈아서)',out:'mold_spear',n:1,shape:['SSS','SPS','SPS'],key:{S:'stone',P:'pebble'}},
+];
+const METAL_NEED={axe:[3,2],pick:[3,2],shovel:[2,2],sword:[3,1],spear:[1,3]};   // [주괴, 막대기]
+for(const [tier,ing] of [[2,'bronze_ingot'],[3,'iron_ingot']])
+  for(const kind of ['axe','pick','shovel','sword','spear']){
+    const [ni,ns]=METAL_NEED[kind];
+    RECIPES.push({cat:`${TIER_NAME[tier]} 도구 (틀 + 주괴 + 막대기, 틀은 남아요)`,out:['','stone','bronze','iron'][tier]+'_'+kind,n:1,
+      need:{['mold_'+kind]:1,[ing]:ni,stick:ns},keep:['mold_'+kind]});
+  }
+RECIPES.push(
+  {cat:'블록·설비',out:'plank_block',n:2,shape:['PP','PP'],key:{P:'plank'}},
+  {cat:'블록·설비',out:'brick',n:4,shape:['SS','SS'],key:{S:'stone'}},
+  {cat:'블록·설비',out:'support',n:2,shape:['PPP','L L'],key:{P:'plank',L:'log'}},
+  {cat:'블록·설비',out:'furnace',n:1,shape:['SSS','S S','SSS'],key:{S:'stone'}},
+  {cat:'블록·설비',out:'blast',n:1,shape:['BBB','BFB','BIB'],key:{B:'brick',F:'furnace',I:'iron_ingot'}},
+);
+// 화로에서 녹이기
+const SMELT=[
+  {a:'copper_ore',out:'copper_ingot',n:1,time:6},
+  {a:'tin_ore',out:'tin_ingot',n:1,time:6},
+  {a:'iron_ore',out:'iron_ingot',n:1,time:9},
+  {a:'log',out:'charcoal',n:1,time:6},
+  {a:'copper_ingot',b:'tin_ingot',out:'bronze_ingot',n:2,time:8},
+  {a:'copper_ore',b:'tin_ore',out:'bronze_ingot',n:2,time:12},
+  {a:'bauxite',out:'alu_ingot',n:1,time:12,blast:true},
+];
+const FUEL={fiber:1,stick:2,plank:4,log:12,plank_block:15,charcoal:30,coal:40};
+// 도구 모양 (손에 들 때·바닥에 놓일 때)
+function makeToolGeo(kind,tier){
+  const gb=new GB(),hc=[null,[0.52,0.51,0.49],[0.78,0.55,0.25],[0.74,0.76,0.79]][tier],wood=[0.45,0.32,0.2];
+  if(kind==='spear'){addCyl(gb,V(0,-0.4,0),V(0,0.8,0),0.017,0.015,6,wood,0);addBox(gb,0,0.88,0,0.05,0.18,0.02,hc);return gb.build();}
+  if(kind==='sword'){addCyl(gb,V(0,-0.05,0),V(0,0.12,0),0.018,0.018,6,wood,0);addBox(gb,0,0.13,0,0.16,0.03,0.04,hc);addBox(gb,0,0.45,0,0.05,0.6,0.012,hc);return gb.build();}
+  addCyl(gb,V(0,-0.05,0),V(0,0.55,0),0.018,0.016,6,wood,0);
+  if(kind==='axe'){addBox(gb,0.05,0.48,0,0.15,0.08,0.045,hc);addBox(gb,0,0.48,0,0.05,0.1,0.05,[0.55,0.45,0.3]);}
+  if(kind==='pick')addBox(gb,0,0.52,0,0.42,0.05,0.045,hc);
+  if(kind==='shovel')addBox(gb,0,0.66,0,0.14,0.2,0.02,hc);
+  return gb.build();
+}
+for(const id in ITEMS){const it=ITEMS[id];if(it.tool){it.handGeo=makeToolGeo(it.tool,it.tier);it.groundGeo=it.handGeo.clone().rotateZ(Math.PI/2);}}
+// 작은 모양 도우미
+function addCap(gb,c,n,r,col){
+  const t=Math.abs(n.y)<0.9?V(0,1,0):V(1,0,0),X=t.clone().cross(n).normalize(),Z=X.clone().cross(n);
+  for(let k=0;k<10;k++){const a0=k/10*6.2832,a1=(k+1)/10*6.2832;
+    const p0=c.clone().addScaledVector(X,Math.cos(a0)*r).addScaledVector(Z,Math.sin(a0)*r),p1=c.clone().addScaledVector(X,Math.cos(a1)*r).addScaledVector(Z,Math.sin(a1)*r);
+    gb.vp(c,n,0.5,0.5,col);gb.vp(p1,n,0.5,0.5,col);gb.vp(p0,n,0.5,0.5,col);}
+}
+function addDome(gb,cy,r,h,col){
+  const L=10,R=4,pt=(i,j)=>{const ph=i/R*Math.PI/2,th=j/L*6.2832,x=r*Math.sin(ph)*Math.cos(th),y=h*Math.cos(ph),z=r*Math.sin(ph)*Math.sin(th);
+    return [V(x,cy+y,z),V(x/(r*r),y/(h*h),z/(r*r)).normalize()];};
+  for(let i=0;i<R;i++)for(let j=0;j<L;j++){const a=pt(i,j),b=pt(i+1,j),c=pt(i+1,j+1),d=pt(i,j+1);
+    for(const q of [a,c,b,a,d,c])gb.vp(q[0],q[1],0,0,col);}
+}
+function addBox(gb,cx,cy,cz,sx,sy,sz,col){
+  const F=[[[1,0,0],[0,0,-1],[0,1,0]],[[-1,0,0],[0,0,1],[0,1,0]],[[0,1,0],[1,0,0],[0,0,-1]],[[0,-1,0],[1,0,0],[0,0,1]],[[0,0,1],[1,0,0],[0,1,0]],[[0,0,-1],[-1,0,0],[0,1,0]]];
+  const hs=[sx/2,sy/2,sz/2],hv=v=>v[0]*hs[0]+v[1]*hs[1]+v[2]*hs[2];
+  for(const [n,u,w] of F){const dn=Math.abs(hv(n)),du=Math.abs(hv(u)),dw=Math.abs(hv(w));
+    const c=V(cx+n[0]*dn,cy+n[1]*dn,cz+n[2]*dn),U=V(u[0]*du,u[1]*du,u[2]*du),W=V(w[0]*dw,w[1]*dw,w[2]*dw),N=V(n[0],n[1],n[2]);
+    const p0=c.clone().sub(U).sub(W),p1=c.clone().add(U).sub(W),p2=c.clone().add(U).add(W),p3=c.clone().sub(U).add(W);
+    for(const p of [p0,p1,p2,p0,p2,p3])gb.vp(p,N,0,0,col);}
+}
+function makeMushroomGeo(capCol,r,h){
+  const gb=new GB();
+  addCyl(gb,V(0,0,0),V(0,0.08,0),0.018,0.014,6,[0.92,0.9,0.82],0);
+  addDome(gb,0.07,r,h,capCol);addCap(gb,V(0,0.07,0),V(0,-1,0),r,[0.85,0.8,0.7]);
+  return gb.build();
+}
+const axeGeo=(()=>{const gb=new GB();
+  addCyl(gb,V(0,-0.05,0),V(0,0.55,0),0.018,0.016,6,[0.45,0.32,0.2],0);
+  addBox(gb,0.05,0.48,0,0.15,0.08,0.045,[0.52,0.51,0.49]);
+  addBox(gb,0,0.48,0,0.05,0.1,0.05,[0.55,0.45,0.3]);       // 묶은 끈
+  return gb.build();})();
+const axeGroundGeo=axeGeo.clone();axeGroundGeo.rotateZ(Math.PI/2);
+const vcMat=new THREE.MeshLambertMaterial({vertexColors:true});
+const stickGeo=new THREE.CylinderGeometry(0.022,0.032,1,6);stickGeo.rotateZ(Math.PI/2);
+const pebbleGeo=new THREE.IcosahedronGeometry(0.08,0);pebbleGeo.scale(1,0.55,0.8);
+const logItemGeo=new THREE.CylinderGeometry(0.14,0.14,0.8,8);logItemGeo.rotateZ(Math.PI/2);
+const ITEM_MESH={
+  stick:{geo:stickGeo,mat:new THREE.MeshLambertMaterial({color:0x8a6a48,map:barkTex})},
+  pebble:{geo:pebbleGeo,mat:new THREE.MeshLambertMaterial({color:0x9a968e,map:rockTex})},
+  log:{geo:logItemGeo,mat:new THREE.MeshLambertMaterial({color:0x8a6a4a,map:barkTex})},
+  apple:{geo:new THREE.SphereGeometry(0.05,10,8),mat:new THREE.MeshLambertMaterial({color:0xb8221a})},
+  blueberry:{geo:new THREE.SphereGeometry(0.035,6,5),mat:new THREE.MeshLambertMaterial({color:0x2a3570})},
+  mushroom_brown:{geo:makeMushroomGeo([0.55,0.36,0.2],0.055,0.04),mat:vcMat},
+  mushroom_red:{geo:makeMushroomGeo([0.8,0.12,0.1],0.06,0.045),mat:vcMat},
+  stone_axe:{geo:axeGroundGeo,mat:vcMat},
+};
+const ITEM_Y={stick:0.03,pebble:0.035,log:0.14,apple:0.045,blueberry:0.03,mushroom_brown:0,mushroom_red:0,stone_axe:0.03};
+// 나머지 아이템의 바닥 모양은 종류에 따라 자동으로
+const ingotGeo=new THREE.BoxGeometry(0.2,0.06,0.09),lumpGeo=new THREE.DodecahedronGeometry(0.09,0),plankGeo=new THREE.BoxGeometry(0.6,0.035,0.12);
+const torchItemGeo=(()=>{const gb=new GB();addCyl(gb,V(0,-0.2,0),V(0,0.25,0),0.022,0.022,6,[0.48,0.34,0.22],0);addBox(gb,0,0.28,0,0.06,0.07,0.06,[0.15,0.13,0.12]);return gb.build();})();
+const ITEM_COL={fiber:0x7aa040,cord:0xa08a50,copper_ore:0x9a7a60,tin_ore:0xb0b0aa,iron_ore:0x9a6a50,bauxite:0xa85a40,coal:0x262626,charcoal:0x3a3028,
+  copper_ingot:0xd07a40,tin_ingot:0xd8d8d2,bronze_ingot:0xc89040,iron_ingot:0xa8acb2,alu_ingot:0xe0e4ea};
+const matCache={},colMat=h=>matCache[h]||(matCache[h]=new THREE.MeshLambertMaterial({color:h}));
+ITEM_MESH.stone_axe={geo:ITEMS.stone_axe.groundGeo,mat:vcMat};
+for(const id in ITEMS){
+  if(ITEM_MESH[id])continue;
+  const it=ITEMS[id];let m;
+  if(it.place)m={geo:blockGeo(it.place,0.3),mat:voxMat,y:0.15};
+  else if(it.tool)m={geo:it.groundGeo,mat:vcMat,y:0.03};
+  else if(it.mold)m={geo:new THREE.BoxGeometry(0.3,0.08,0.22),mat:colMat(0x8d8a84),y:0.04};
+  else if(id.endsWith('_ingot'))m={geo:ingotGeo,mat:colMat(ITEM_COL[id]),y:0.03};
+  else if(id==='plank')m={geo:plankGeo,mat:colMat(0xb4844e),y:0.02};
+  else if(id==='torch')m={geo:torchItemGeo.clone().rotateZ(Math.PI/2),mat:vcMat,y:0.03};
+  else m={geo:lumpGeo,mat:colMat(ITEM_COL[id]||0x888888),y:0.06};
+  ITEM_MESH[id]=m;ITEM_Y[id]=m.y;
+}
+const TAKEN=new Set();        // 이미 주운 바닥 물건 (청크를 다시 불러와도 안 생기게)
+const ZERO_M=new THREE.Matrix4().makeScale(0,0,0);
+const _m=new THREE.Matrix4(),_q=new THREE.Quaternion(),_s=new THREE.Vector3(),_p=new THREE.Vector3(),_e=new THREE.Euler();
+function itemMatrix(it){
+  const sc=it.s||1;
+  _p.set(it.x,it.y+ITEM_Y[it.type]*sc,it.z);_e.set(0,it.rot,it.type==='stick'?0.04:0);_q.setFromEuler(_e);
+  if(it.type==='stick')_s.set(it.len||0.7,1,1);else _s.set(sc,sc,sc);
+  return _m.compose(_p,_q,_s);
+}
+function buildItemMeshes(c){
+  c.itemMeshes=[];
+  for(const type of Object.keys(ITEM_MESH)){
+    const list=c.items.filter(it=>it.type===type);if(!list.length)continue;
+    const mesh=new THREE.InstancedMesh(ITEM_MESH[type].geo,ITEM_MESH[type].mat,list.length),col=new THREE.Color();
+    list.forEach((it,i)=>{it.mesh=mesh;it.inst=i;mesh.setMatrixAt(i,it.taken?ZERO_M:itemMatrix(it));
+      const v=0.8+((i*37)%10)/25;col.setRGB(v,v,v);mesh.setColorAt(i,col);});
+    mesh.receiveShadow=true;mesh.frustumCulled=false;scene.add(mesh);c.itemMeshes.push(mesh);
+  }
+}
+function removeItemMeshes(c){
+  for(const m of c.itemMeshes){scene.remove(m);if(m.dispose)m.dispose();}
+  for(const it of c.items)it.mesh=null;
+  c.itemMeshes=null;
+}
+// 땅에 버린 물건
+const dropped=[];
+function spawnDropAt(type,n,x,z,dur,y){
+  const d={type,n,dur,x,z,rot:Math.random()*6.2832,len:0.7,s:1};
+  d.y=y===undefined?groundH(x,z):y;
+  const mesh=new THREE.Mesh(ITEM_MESH[type].geo,ITEM_MESH[type].mat);
+  mesh.matrixAutoUpdate=false;mesh.matrix.copy(itemMatrix(d));mesh.receiveShadow=true;
+  scene.add(mesh);d.mesh=mesh;dropped.push(d);
+}
+function spawnDrop(type,n,dur){
+  const fx=-Math.sin(P.yaw),fz=-Math.cos(P.yaw);
+  spawnDropAt(type,n,P.x+fx*1.1+(Math.random()-0.5)*0.3,P.z+fz*1.1+(Math.random()-0.5)*0.3,dur);
+}
+
+// ================= 나무·죽은 통나무·덤불 (바뀔 수 있는 것) =================
+const STATE=new Map();       // id → {hp, chopped, apples, gone, picked}
+function st(id){let s=STATE.get(id);if(!s){s={};STATE.set(id,s);}return s;}
+const stOf=id=>STATE.get(id)||{};
+const TREE_HP={broad:6,birch:5,conifer:8};
+const treeName=t=>t.apple?'사과나무':{broad:'참나무',birch:'자작나무',conifer:'소나무'}[t.type];
+function treeRnd(t){return mulberry32(hash3(SEED+11,Math.floor(t.x*10),Math.floor(t.z*10)));}
+function makeTree(tg,lg,t,x,y,z){const r=treeRnd(t);return t.type==='conifer'?makeConifer(tg,lg,x,y,z,r):makeBroadleaf(tg,lg,x,y,z,r,t.type==='birch');}
+function distToSeg(px,pz,ax,az,bx,bz){const dx=bx-ax,dz=bz-az,l2=dx*dx+dz*dz;let t=((px-ax)*dx+(pz-az)*dz)/l2;t=Math.max(0,Math.min(1,t));return Math.hypot(px-ax-dx*t,pz-az-dz*t);}
+function applePositions(t,info){
+  const r=mulberry32(hash3(SEED+23,Math.floor(t.x*10),Math.floor(t.z*10))),n=4+Math.floor(r()*5),out=[];
+  for(let i=0;i<n;i++){const k=info.clusters[i%info.clusters.length],d=randDir(r);d.y=-Math.abs(d.y)*0.6-0.2;d.normalize();
+    out.push(k.clone().addScaledVector(d,info.CR*0.55));}
+  return out;
+}
+function addStump(tg,t){
+  const rad=t.rad||0.3,top=V(t.x,t.y+0.45,t.z);
+  addCyl(tg,V(t.x,t.y-0.4,t.z),top,rad*1.05,rad,8,[0.6,0.5,0.42],0);
+  addCap(tg,top,V(0,1,0),rad,[1.3,1.1,0.8]);
+}
+function addBush(lg,b){
+  const r=mulberry32(hash3(SEED+29,Math.floor(b.x*10),Math.floor(b.z*10))),c=V(b.x,b.y+0.45,b.z);
+  for(let i=0;i<16;i++){
+    const d=randDir(r);d.y=Math.abs(d.y)*0.8;const p=c.clone().addScaledVector(d,0.35*Math.cbrt(r())+0.1);
+    const sz=0.32+r()*0.15,pn=randDir(r),tt=Math.abs(pn.y)<0.9?V(0,1,0):V(1,0,0);
+    const Rv=tt.clone().cross(pn).normalize().multiplyScalar(sz),Uv=pn.clone().cross(Rv).normalize().multiplyScalar(sz);
+    const out=d.clone();out.y+=0.6;out.normalize();const sh=0.75+r()*0.3;
+    addCard(lg,p,Rv,Uv,out,0,0.5,[0.5*sh,0.66*sh,0.48*sh]);
+  }
+  const berries=[],n=10+Math.floor(r()*7);
+  for(let i=0;i<n;i++){const d=randDir(r);d.y=Math.abs(d.y)*0.7;berries.push(c.clone().addScaledVector(d,0.42+r()*0.1));}
+  return berries;
+}
+const fruitGeo=new THREE.SphereGeometry(1,8,6),fruitMat=new THREE.MeshLambertMaterial({color:0xffffff});
+const APPLE_COL=new THREE.Color(0.78,0.1,0.07),BERRY_COL=new THREE.Color(0.16,0.2,0.45);
+function clearFlora(c){
+  for(const m of c.flora){scene.remove(m);if(m.isInstancedMesh){if(m.dispose)m.dispose();}else m.geometry.dispose();}
+  c.flora=[];
+}
+function buildFlora(c){             // 나무·통나무·덤불 모양을 지금 상태대로 다시 만듦
+  clearFlora(c);
+  const tg=new GB(),lg=new GB(),fr=[],cols=c.rockColliders.slice();
+  for(const t of c.trees){
+    const s=stOf(t.id);
+    if(s.chopped){
+      if(t.rad===undefined)t.rad=makeTree(new GB(),new GB(),t,0,0,0).rad;
+      addStump(tg,t);cols.push({x:t.x,z:t.z,r:t.rad,top:t.y+0.45});continue;
+    }
+    const info=makeTree(tg,lg,t,t.x,t.y,t.z);t.rad=info.rad;cols.push({x:t.x,z:t.z,r:info.rad});
+    if(t.apple){const ap=applePositions(t,info);t.appleMax=ap.length;const n=s.apples??ap.length;
+      for(let i=0;i<n;i++)fr.push([ap[i],0.05,APPLE_COL]);}
+  }
+  for(const l of c.logs){
+    if(stOf(l.id).gone)continue;
+    addCyl(tg,l.a,l.b,l.r,l.r*0.9,9,[0.5,0.47,0.36],0);
+    const ax=l.b.clone().sub(l.a).normalize();
+    addCap(tg,l.b,ax,l.r*0.9,[1.1,0.9,0.65]);addCap(tg,l.a,ax.clone().negate(),l.r,[1.1,0.9,0.65]);
+    const n=Math.ceil(l.a.distanceTo(l.b)/0.6);
+    for(let i=0;i<=n;i++){const p=l.a.clone().lerp(l.b,i/n);cols.push({x:p.x,z:p.z,r:l.r,top:l.top});}
+  }
+  for(const b of c.bushes){const berries=addBush(lg,b);if(!stOf(b.id).picked)for(const p of berries)fr.push([p,0.028,BERRY_COL]);}
+  const reedsLeft=c.reeds.filter(r=>!stOf(r.id).picked);
+  if(reedsLeft.length){
+    const m=new THREE.InstancedMesh(reedGeo,grassMat,reedsLeft.length),col=new THREE.Color();
+    reedsLeft.forEach((r,i)=>{_e.set(0,r.rot,0);_q.setFromEuler(_e);_p.set(r.x,r.y-0.05,r.z);_s.set(r.s,r.s,r.s);m.setMatrixAt(i,_m.compose(_p,_q,_s));
+      const v=0.85+((i*53)%10)/30;col.setRGB(v,v,v);m.setColorAt(i,col);});
+    m.frustumCulled=false;c.flora.push(m);
+  }
+  if(!tg.empty){const m=new THREE.Mesh(tg.build(),barkMat);m.castShadow=m.receiveShadow=true;c.flora.push(m);}
+  if(!lg.empty){const m=new THREE.Mesh(lg.build(),leafMat);m.castShadow=m.receiveShadow=true;m.customDepthMaterial=leafDepthMat;c.flora.push(m);}
+  if(fr.length){const m=new THREE.InstancedMesh(fruitGeo,fruitMat,fr.length);
+    fr.forEach(([p,s,col],i)=>{_m.makeScale(s,s,s).setPosition(p);m.setMatrixAt(i,_m);m.setColorAt(i,col);});
+    m.frustumCulled=false;c.flora.push(m);}
+  for(const m of c.flora)scene.add(m);
+  c.colliders=cols;
+}
+// 쓰러지는 나무 (중력)
+const falling=[];
+function fellTree(t,c){
+  st(t.id).chopped=true;
+  const tg=new GB(),lg=new GB();makeTree(tg,lg,t,0,0,0);
+  const g=new THREE.Group(),inner=new THREE.Group();
+  g.position.set(t.x,t.y+0.45,t.z);inner.position.y=-0.45;g.add(inner);
+  const m1=new THREE.Mesh(tg.build(),barkMat);m1.castShadow=true;inner.add(m1);
+  if(!lg.empty){const m2=new THREE.Mesh(lg.build(),leafMat);m2.castShadow=true;m2.customDepthMaterial=leafDepthMat;inner.add(m2);}
+  scene.add(g);
+  let dx=t.x-P.x,dz=t.z-P.z;const l=Math.hypot(dx,dz)||1;dx/=l;dz/=l;     // 나를 등지고 넘어짐
+  const e=Math.atan2(groundH(t.x+dx*5,t.z+dz*5)-(t.y+0.45),5);
+  const maxAng=Math.max(1.2,Math.min(1.9,Math.PI/2-e-0.05));
+  falling.push({g,t,dx,dz,axis:V(dz,0,-dx),ang:0,vel:0.12,maxAng,landed:false,timer:0,apples:t.apple?(stOf(t.id).apples??t.appleMax):0});
+  buildFlora(c);
+  toast(`${treeName(t)}가 쓰러져요!`);
+}
+function updateFalling(dt){
+  for(let i=falling.length-1;i>=0;i--){
+    const f=falling[i];
+    if(!f.landed){
+      f.vel+=Math.sin(f.ang+0.08)*3.2*dt;f.ang+=f.vel*dt;
+      if(f.ang>=f.maxAng){f.ang=f.maxAng;f.landed=true;}
+      f.g.quaternion.setFromAxisAngle(f.axis,f.ang);
+    }else if((f.timer+=dt)>1.2){
+      scene.remove(f.g);f.g.traverse(o=>{if(o.geometry)o.geometry.dispose();});
+      const t=f.t,nLog={broad:3,birch:2,conifer:4}[t.type];
+      for(let k=0;k<nLog;k++){const d=1.5+k*1.6;spawnDropAt('log',1,t.x+f.dx*d,t.z+f.dz*d);}
+      const ns=1+Math.floor(Math.random()*2);
+      for(let k=0;k<ns;k++){const d=2+Math.random()*5,o=(Math.random()-0.5)*2;spawnDropAt('stick',1,t.x+f.dx*d-f.dz*o,t.z+f.dz*d+f.dx*o);}
+      for(let k=0;k<f.apples;k++){const d=4+Math.random()*3,o=(Math.random()-0.5)*3;spawnDropAt('apple',1,t.x+f.dx*d-f.dz*o,t.z+f.dz*d+f.dx*o);}
+      falling.splice(i,1);
+    }
+  }
+}
+
+// ================= 암석 지대 (블록으로 된 바위 언덕, 안에 광맥) =================
+const MG=96,moundCache=new Map(),MODS=new Map(),FURN=new Map();
+function getMound(mx,mz){
+  const k=mx+','+mz;if(moundCache.has(k))return moundCache.get(k);
+  let m=null;const h=hash3(SEED+41,mx,mz);
+  if(h%100<40){const r=mulberry32(h),cx=mx*MG+24+r()*(MG-48),cz=mz*MG+24+r()*(MG-48);
+    if(terrainH(cx,cz)>WATER_Y+1.5)m={cx,cz,R:7+r()*7,H:7+r()*9,k:r()*100};}
+  moundCache.set(k,m);return m;
+}
+function moundsNear(x0,z0,x1,z1){
+  const out=[];
+  for(let mx=Math.floor((x0-30)/MG);mx<=Math.floor((x1+30)/MG);mx++)for(let mz=Math.floor((z0-30)/MG);mz<=Math.floor((z1+30)/MG);mz++){
+    const m=getMound(mx,mz);if(!m)continue;const R=m.R*1.3;
+    if(m.cx+R<x0||m.cx-R>x1||m.cz+R<z0||m.cz-R>z1)continue;out.push(m);}
+  return out;
+}
+function moundColumn(x,z,list){         // 칸 (x,z) 의 바위 기둥 [아래, 위)
+  list=list||moundsNear(x,z,x+1,z+1);
+  let best=null;
+  for(const m of list){
+    const px=x+0.5,pz=z+0.5,d=Math.hypot(px-m.cx,pz-m.cz);if(d>m.R*1.3)continue;
+    const edge=m.R*(1+0.28*nD(px*0.11+m.k,pz*0.11-m.k));if(d>=edge)continue;
+    const g=terrainH(px,pz),t=1-(d/edge)**2;
+    const top=Math.floor(g+m.H*Math.pow(t,0.6)+nD(px*0.3,pz*0.3+m.k)*1.2+0.5),bot=Math.floor(g)-1;
+    if(top<=bot+1)continue;
+    if(!best||top>best[1])best=[bot,top];
+  }
+  return best;
+}
+function oreAt(x,y,z,depth){          // 광맥은 덩어리로 모여 있음. 깊을수록 귀한 광물
+  if(nD(x*0.21+y*0.37+11,z*0.21-y*0.29+5)<0.42)return 1;
+  const sel=hash3(SEED+47,Math.floor(x/3),Math.floor(z/3)*7+Math.floor(y/3))%100;
+  if(depth>=3&&sel<8)return 6;
+  if(depth>=2&&sel<32)return 4;
+  if(sel<58)return 2;
+  if(sel<78)return 3;
+  return 5;
+}
+function genVoxels(c){
+  const vox=new Map(),ox=c.cx*CHUNK,oz=c.cz*CHUNK,list=moundsNear(ox,oz,ox+CHUNK,oz+CHUNK);
+  if(list.length)for(let x=ox;x<ox+CHUNK;x++)for(let z=oz;z<oz+CHUNK;z++){
+    const col=moundColumn(x,z,list);if(!col)continue;
+    for(let y=col[0];y<col[1];y++)vox.set(x+','+y+','+z,oreAt(x,y,z,col[1]-1-y));
+  }
+  const mods=MODS.get(c.cx+','+c.cz);
+  if(mods)for(const [k,v] of mods){if(v)vox.set(k,v);else vox.delete(k);}
+  return vox;
+}
+const vkey=(x,y,z)=>x+','+y+','+z;
+function getVox(x,y,z){const c=chunks.get(Math.floor(x/CHUNK)+','+Math.floor(z/CHUNK));return c&&c.vox?(c.vox.get(x+','+y+','+z)||0):0;}
+const dirtyVox=new Set();
+function markDirty(cx,cz){const c=chunks.get(cx+','+cz);if(c)dirtyVox.add(c);}
+function setVox(x,y,z,v){
+  const cx=Math.floor(x/CHUNK),cz=Math.floor(z/CHUNK),ck=cx+','+cz,c=chunks.get(ck),k=vkey(x,y,z);
+  let m=MODS.get(ck);if(!m){m=new Map();MODS.set(ck,m);}m.set(k,v);
+  if(c){if(v)c.vox.set(k,v);else c.vox.delete(k);dirtyVox.add(c);}
+  const lx=x-cx*CHUNK,lz=z-cz*CHUNK;
+  if(lx===0)markDirty(cx-1,cz);if(lx===CHUNK-1)markDirty(cx+1,cz);if(lz===0)markDirty(cx,cz-1);if(lz===CHUNK-1)markDirty(cx,cz+1);
+}
+function flushVox(){for(const c of dirtyVox)if(chunks.get(c.cx+','+c.cz)===c)buildVoxMesh(c);dirtyVox.clear();}
+const DIRS=[[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
+const FACE_V=[
+  [[1,0,1],[1,0,0],[1,1,0],[1,1,1]],[[0,0,0],[0,0,1],[0,1,1],[0,1,0]],
+  [[0,1,1],[1,1,1],[1,1,0],[0,1,0]],[[0,0,0],[1,0,0],[1,0,1],[0,0,1]],
+  [[0,0,1],[1,0,1],[1,1,1],[0,1,1]],[[1,0,0],[0,0,0],[0,1,0],[1,1,0]],
+];
+function buildVoxMesh(c){
+  if(c.voxMesh){scene.remove(c.voxMesh);c.voxMesh.geometry.dispose();c.voxMesh=null;}
+  if(!c.vox.size)return;
+  const ox=c.cx*CHUNK,oz=c.cz*CHUNK,P_=[],N_=[],U_=[],C_=[];
+  const gv=(x,y,z)=>(x>=ox&&x<ox+CHUNK&&z>=oz&&z<oz+CHUNK)?(c.vox.get(x+','+y+','+z)||0):getVox(x,y,z);
+  for(const [k,b] of c.vox){
+    const p=k.split(','),x=+p[0],y=+p[1],z=+p[2],B=BLOCKS[b];
+    for(let f=0;f<6;f++){
+      const d=DIRS[f],nb=gv(x+d[0],y+d[1],z+d[2]);
+      if(nb&&(!BLOCKS[nb].see||nb===b))continue;
+      const tile=(f===2||f===3)&&B.top!==undefined?B.top:B.tile,[u0,v0,u1,v1]=tileUV(tile);
+      // 굴 안쪽 면은 어둡게 (면 앞 칸 위가 바위로 덮여 있으면)
+      const fx=x+d[0],fy=y+d[1],fz=z+d[2];let cover=false;
+      for(let yy=fy+1;yy<fy+14;yy++)if(gv(fx,yy,fz)){cover=true;break;}
+      const sh=cover?0.45:1,fv=FACE_V[f],uvs=[[u0,v0],[u1,v0],[u1,v1],[u0,v1]];
+      for(const q of [0,1,2,0,2,3]){P_.push(x+fv[q][0],y+fv[q][1],z+fv[q][2]);N_.push(d[0],d[1],d[2]);U_.push(uvs[q][0],uvs[q][1]);C_.push(sh,sh,sh);}
+    }
+  }
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(P_,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(N_,3));
+  g.setAttribute('uv',new THREE.Float32BufferAttribute(U_,2));g.setAttribute('color',new THREE.Float32BufferAttribute(C_,3));
+  g.computeBoundingSphere();
+  const m=new THREE.Mesh(g,voxMat);m.castShadow=m.receiveShadow=true;scene.add(m);c.voxMesh=m;
+}
+// 시선이 처음 닿는 블록 (칸을 하나씩 따라감)
+function voxRay(o,d,max){
+  let x=Math.floor(o.x),y=Math.floor(o.y),z=Math.floor(o.z);
+  const sx=d.x>0?1:-1,sy=d.y>0?1:-1,sz=d.z>0?1:-1,tdx=Math.abs(1/d.x),tdy=Math.abs(1/d.y),tdz=Math.abs(1/d.z);
+  let tx=(d.x>0?x+1-o.x:o.x-x)*tdx,ty=(d.y>0?y+1-o.y:o.y-y)*tdy,tz=(d.z>0?z+1-o.z:o.z-z)*tdz,nx=0,ny=0,nz=0,t=0;
+  for(let i=0;i<80;i++){
+    const b=getVox(x,y,z);if(b)return {x,y,z,b,nx,ny,nz,t};
+    if(tx<ty&&tx<tz){x+=sx;t=tx;tx+=tdx;nx=-sx;ny=0;nz=0;}
+    else if(ty<tz){y+=sy;t=ty;ty+=tdy;nx=0;ny=-sy;nz=0;}
+    else{z+=sz;t=tz;tz+=tdz;nx=0;ny=0;nz=-sz;}
+    if(t>max)return null;
+  }
+  return null;
+}
+function dropY(x,y,z){                   // (x,z) 에서 y 아래로 가장 가까운 바닥
+  const gx=Math.floor(x),gz=Math.floor(z),g=groundH(x,z);
+  for(let yy=Math.floor(y);yy>=Math.floor(g)-1&&yy>y-30;yy--)if(getVox(gx,yy,gz))return Math.max(yy+1,g);
+  return g;
+}
+function newFurnace(blast){return {slots:[null,null,null,null],burn:0,burnMax:1,prog:0,blast,dirty:true};}
+function placeBlock(type,x,y,z){
+  if(getVox(x,y,z))return false;
+  if(P.x+PR>x&&P.x-PR<x+1&&P.z+PR>z&&P.z-PR<z+1&&P.y<y+1&&P.y+1.8>y)return false;   // 내 몸이 있는 곳
+  setVox(x,y,z,type);
+  if(type===11||type===12)FURN.set(vkey(x,y,z),newFurnace(type===12));
+  return true;
+}
+function breakBlock(x,y,z){
+  const b=getVox(x,y,z);if(!b)return;
+  setVox(x,y,z,0);
+  const B=BLOCKS[b],dy=dropY(x+0.5,y+0.5,z+0.5);
+  spawnDropAt(B.item,1,x+0.5,z+0.5,undefined,dy);
+  const fk=vkey(x,y,z),f=FURN.get(fk);
+  if(f){for(const s of f.slots)if(s)spawnDropAt(s.type,s.n,x+0.3+Math.random()*0.4,z+0.3+Math.random()*0.4,s.dur,dy);FURN.delete(fk);}
+  if(B.natural)checkCollapse(x,y,z);
+}
+// ---- 무너짐: 지지대 없이 바위를 캐면 천장이 무너질 수 있음 ----
+function supported(x,y,z){
+  for(let dx=-2;dx<=2;dx++)for(let dz=-2;dz<=2;dz++)for(let dy=-3;dy<=0;dy++)if(getVox(x+dx,y+dy,z+dz)===10)return true;
+  return false;
+}
+function checkCollapse(x,y,z){
+  const roof=getVox(x,y+1,z);if(!roof||!BLOCKS[roof].natural)return;
+  if(supported(x,y+1,z))return;
+  let open=0;for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1]])if(!getVox(x+dx,y,z+dz))open++;
+  if(Math.random()>0.25+open*0.12){toast('⚠ 천장에서 돌가루가 떨어져요… 지지대를 세워요');return;}
+  for(let yy=y+1;yy<y+5;yy++){const b=getVox(x,yy,z);if(!b||!BLOCKS[b].natural)break;setVox(x,yy,z,0);spawnFallingBlock(x,yy,z,b);}
+  toast('⚠ 천장이 무너졌어요! 굴을 팔 때는 지지대를 세워야 해요');
+}
+const fallingBlocks=[];
+function spawnFallingBlock(x,y,z,b){
+  const m=new THREE.Mesh(blockGeo(b,1),voxMat);m.position.set(x+0.5,y+0.5,z+0.5);m.castShadow=true;scene.add(m);
+  fallingBlocks.push({x,y,z,b,m,vy:0});
+}
+function updateFallingBlocks(dt){
+  for(let i=fallingBlocks.length-1;i>=0;i--){
+    const f=fallingBlocks[i];f.vy=Math.max(-20,f.vy-GRAV*dt);f.y+=f.vy*dt;
+    const cy=Math.floor(f.y),g=groundH(f.x+0.5,f.z+0.5),hitVox=getVox(f.x,cy,f.z)!==0;
+    if(hitVox||f.y<=g-0.4){
+      const ly=hitVox?cy+1:Math.max(cy,Math.floor(g+0.4));
+      scene.remove(f.m);fallingBlocks.splice(i,1);
+      const onMe=P.x+PR>f.x&&P.x-PR<f.x+1&&P.z+PR>f.z&&P.z-PR<f.z+1&&P.y<ly+1&&P.y+1.8>ly;
+      if(onMe||getVox(f.x,ly,f.z)){if(onMe)hurt(25,'떨어진 돌에 맞았어요!');spawnDropAt(BLOCKS[f.b].item,1,f.x+0.5,f.z+0.5,undefined,dropY(f.x+0.5,ly+0.5,f.z+0.5));}
+      else setVox(f.x,ly,f.z,f.b);
+      continue;
+    }
+    f.m.position.y=f.y+0.5;
+  }
+}
+// ---- 화로·용광로 ----
+function smeltRec(f){
+  const A=f.slots[0],B=f.slots[1];
+  for(const r of SMELT){
+    if(r.blast&&!f.blast)continue;
+    if(r.b){if(A&&B&&((A.type===r.a&&B.type===r.b)||(A.type===r.b&&B.type===r.a)))return r;}
+    else if((A&&A.type===r.a&&!B)||(B&&B.type===r.a&&!A))return r;
+  }
+  return null;
+}
+function updateFurnaces(dt){
+  for(const f of FURN.values()){
+    const r=smeltRec(f),out=f.slots[3];
+    const can=!!r&&(!out||(out.type===r.out&&out.n+r.n<=ITEMS[r.out].stack));
+    if(can&&f.burn<=0){const fu=f.slots[2];
+      if(fu&&FUEL[fu.type]){f.burn=f.burnMax=FUEL[fu.type];fu.n--;if(!fu.n)f.slots[2]=null;f.dirty=true;}}
+    if(f.burn>0){
+      f.burn-=dt;
+      if(can){f.prog+=dt*(f.blast?1.5:1);
+        if(f.prog>=r.time){f.prog=0;
+          for(const i of [0,1]){const s=f.slots[i];if(s&&(s.type===r.a||s.type===r.b)){s.n--;if(!s.n)f.slots[i]=null;}}
+          if(f.slots[3])f.slots[3].n+=r.n;else f.slots[3]=mkStack(r.out,r.n);
+          f.dirty=true;}}
+      else f.prog=0;
+    }else f.prog=Math.max(0,f.prog-dt);
+  }
+}
+// ---- 횃불과 불빛 ----
+const TORCHES=[],flameGeo=new THREE.SphereGeometry(0.07,8,6),flameMat=new THREE.MeshBasicMaterial({color:0xffb040});
+function addTorch(x,y,z,nx,nz){
+  const g=new THREE.Group();g.position.set(x,y,z);
+  const stick=new THREE.Mesh(torchItemGeo,vcMat);stick.position.y=0.2;g.add(stick);
+  const fl=new THREE.Mesh(flameGeo,flameMat);fl.position.y=0.55;g.add(fl);
+  g.rotation.set((nz||0)*0.45,0,-(nx||0)*0.45);
+  scene.add(g);const t={x,y,z,g,fl,ph:Math.random()*10};TORCHES.push(t);return t;
+}
+const LIGHTS=[];for(let i=0;i<6;i++){const l=new THREE.PointLight(0xffa050,0,13,2);scene.add(l);LIGHTS.push(l);}
+const _lp=new THREE.Vector3();
+function updateLights(t){
+  const src=[];
+  for(const tc of TORCHES){const d=(tc.x-P.x)**2+(tc.z-P.z)**2;if(d<1600){tc.fl.getWorldPosition(_lp);src.push([d,_lp.x,_lp.y,_lp.z,1]);}}
+  for(const [k,f] of FURN)if(f.burn>0){const p=k.split(','),x=+p[0],y=+p[1],z=+p[2],d=(x-P.x)**2+(z-P.z)**2;if(d<1600)src.push([d,x+0.5,y+0.6,z+0.5,0.8]);}
+  const s=inv[sel];if(s&&s.type==='torch')src.push([0,camera.position.x,camera.position.y+0.1,camera.position.z,1]);
+  src.sort((a,b)=>a[0]-b[0]);
+  LIGHTS.forEach((l,i)=>{const q=src[i];if(!q){l.intensity=0;return;}
+    l.position.set(q[1],q[2],q[3]);l.intensity=q[4]*(1.5+Math.sin(t*13+i*2)*0.12+Math.sin(t*7.3+i)*0.1);});
+  for(const tc of TORCHES)tc.fl.scale.setScalar(1+Math.sin(t*15+tc.ph)*0.15);
+}
+// ---- 다침 ----
+function hurt(n,msg){
+  if(admin)return;
+  S.hp=Math.max(0,S.hp-n);toast(msg);
+  const h=$('hurt');h.style.opacity=0.6;setTimeout(()=>h.style.opacity=0,180);
+  if(S.hp<=0){S.hp=100;setTimeout(()=>toast('쓰러졌다가 정신을 차렸어요'),1500);}
+}
+// 물가 풀 모양
+const reedGeo=(()=>{
+  const gb=new GB(),r=mulberry32(8),base=[0.24,0.32,0.12],tip=[0.62,0.64,0.3];
+  for(let b=0;b<8;b++){
+    const ox=(r()-0.5)*0.3,oz=(r()-0.5)*0.3,a=r()*6.2832,h=1+r()*0.6,w=0.03,bend=0.15+r()*0.25,cx=Math.cos(a),sz=Math.sin(a),fx=-sz,fz=cx;
+    const loc=[[-w,0,0],[w,0,0],[-w*0.7,h*0.5,bend*0.3],[w*0.7,h*0.5,bend*0.3],[0,h,bend]];
+    const Pt=loc.map(([s,y,f])=>[ox+s*cx+f*fx,y,oz+s*sz+f*fz]);
+    const Cl=loc.map(([,y])=>{const t=y/h;return [base[0]+(tip[0]-base[0])*t,base[1]+(tip[1]-base[1])*t,base[2]+(tip[2]-base[2])*t];});
+    for(const [i,j,k] of [[0,1,2],[1,3,2],[2,3,4]])for(const q of [i,j,k])gb.v(Pt[q][0],Pt[q][1],Pt[q][2],0,1,0,0,0,Cl[q]);
+  }
+  for(let k=0;k<2;k++){const x=(r()-0.5)*0.2,z=(r()-0.5)*0.2;addCyl(gb,V(x,0,z),V(x,1.1,z),0.008,0.006,4,[0.35,0.4,0.18],0);
+    addCyl(gb,V(x,1.1,z),V(x,1.32,z),0.03,0.028,6,[0.32,0.2,0.1],0);}
+  return gb.build();
+})();
+
+// ================= 청크 (무한 맵) =================
+const chunks=new Map();
+// 삽으로 판 땅 (꼭짓점 번호 → 낮아진 높이)
+const DIG=new Map();
+function vertH(ix,iz){return terrainH(ix*RES,iz*RES)+(DIG.get(ix+','+iz)||0);}
+function computeHeights(cx,cz){
+  const W=SEG+3,hs=new Float32Array(W*W);
+  for(let j=0;j<W;j++)for(let i=0;i<W;i++)hs[j*W+i]=vertH(cx*SEG+i-1,cz*SEG+j-1);
+  return hs;
+}
+function makeTerrainMesh(cx,cz,hs){
+  const ox=cx*CHUNK,oz=cz*CHUNK,W=SEG+3,N=SEG+1;
+  const pos=new Float32Array(N*N*3),nor=new Float32Array(N*N*3),col=new Float32Array(N*N*3),uv=new Float32Array(N*N*2),tc=[0,0,0];
+  for(let j=0;j<N;j++)for(let i=0;i<N;i++){
+    const v=j*N+i,h=hs[(j+1)*W+i+1];
+    let nx=hs[(j+1)*W+i]-hs[(j+1)*W+i+2],ny=2*RES,nz=hs[j*W+i+1]-hs[(j+2)*W+i+1];
+    const l=Math.hypot(nx,ny,nz);nx/=l;ny/=l;nz/=l;
+    pos[v*3]=i*RES;pos[v*3+1]=h;pos[v*3+2]=j*RES;
+    nor[v*3]=nx;nor[v*3+1]=ny;nor[v*3+2]=nz;
+    terrainColor(ox+i*RES,oz+j*RES,h,ny,tc);col[v*3]=tc[0];col[v*3+1]=tc[1];col[v*3+2]=tc[2];
+    uv[v*2]=(ox+i*RES)/5;uv[v*2+1]=(oz+j*RES)/5;
+  }
+  const idx=new Uint16Array(SEG*SEG*6);let p=0;
+  for(let j=0;j<SEG;j++)for(let i=0;i<SEG;i++){const a=j*N+i,b=a+1,c=a+N,d=c+1;idx[p++]=a;idx[p++]=c;idx[p++]=b;idx[p++]=b;idx[p++]=c;idx[p++]=d;}
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.BufferAttribute(pos,3));geo.setAttribute('normal',new THREE.BufferAttribute(nor,3));
+  geo.setAttribute('color',new THREE.BufferAttribute(col,3));geo.setAttribute('uv',new THREE.BufferAttribute(uv,2));
+  geo.setIndex(new THREE.BufferAttribute(idx,1));geo.computeBoundingSphere();
+  const terrain=new THREE.Mesh(geo,terrainMat);terrain.position.set(ox,0,oz);terrain.receiveShadow=true;
+  return terrain;
+}
+function rebuildTerrain(c){
+  c.hs=computeHeights(c.cx,c.cz);
+  const old=c.meshes[0];scene.remove(old);old.geometry.dispose();
+  c.meshes[0]=makeTerrainMesh(c.cx,c.cz,c.hs);scene.add(c.meshes[0]);
+  if(c.grass){removeGrass(c);buildGrass(c);}
+}
+function buildChunk(cx,cz){
+  const ox=cx*CHUNK,oz=cz*CHUNK;
+  const hs=computeHeights(cx,cz),terrain=makeTerrainMesh(cx,cz,hs);
+  const inMound=(x,z)=>!!moundColumn(Math.floor(x),Math.floor(z));
+
+  // 나무·바위·죽은 통나무·블루베리 덤불 자리 정하기 (나무 모양은 buildFlora 에서 만듦)
+  const rnd=mulberry32(hash3(SEED,cx,cz)),rg=new GB(),rockColliders=[],trees=[];
+  const local=(x,z)=>gridH(hs,(x-ox)/RES,(z-oz)/RES);
+  for(let t=0;t<70;t++){
+    const x=ox+1+rnd()*(CHUNK-2),z=oz+1+rnd()*(CHUNK-2),r1=rnd(),r2=rnd();
+    if(r1>forestDensity(x,z)*0.55+0.02)continue;
+    const h=local(x,z);if(h<WATER_Y+0.8||inMound(x,z))continue;
+    if(Math.abs(local(x+1,z)-local(x-1,z))+Math.abs(local(x,z+1)-local(x,z-1))>1.6)continue;
+    if(trees.some(o=>(o.x-x)**2+(o.z-z)**2<7.5))continue;
+    const cn=nT(x/150,z/150)*0.5+0.5+(h-5)*0.03;
+    const type=cn>0.62?'conifer':r2<0.18?'birch':'broad';
+    const apple=type==='broad'&&hash3(SEED+19,Math.floor(x*10),Math.floor(z*10))%100<30;   // 활엽수의 30%는 사과나무
+    trees.push({id:cx+','+cz+',t'+trees.length,x,y:h,z,type,apple});
+  }
+  const nRock=Math.floor(rnd()*rnd()*5),rocks=[];
+  for(let i=0;i<nRock;i++){
+    const x=ox+2+rnd()*(CHUNK-4),z=oz+2+rnd()*(CHUNK-4),s=0.5+rnd()*rnd()*2.2,h=local(x,z);
+    if(inMound(x,z))continue;
+    addRock(rg,x,h-s*0.15,z,s,mulberry32(hash3(SEED+13,cx*7+i,cz)));
+    rockColliders.push({x,z,r:s*0.85});rocks.push({x,z,s});
+  }
+  const logs=[],nLog=Math.floor(forestDensity(ox+CHUNK/2,oz+CHUNK/2)*rnd()*3.2);
+  for(let i=0;i<nLog;i++){
+    const x=ox+4+rnd()*(CHUNK-8),z=oz+4+rnd()*(CHUNK-8),a=rnd()*6.2832,len=3+rnd()*3,r=0.22+rnd()*0.16;
+    const ax=x-Math.cos(a)*len/2,az=z-Math.sin(a)*len/2,bx=x+Math.cos(a)*len/2,bz=z+Math.sin(a)*len/2;
+    const ha=local(ax,az),hb=local(bx,bz);if(Math.min(ha,hb)<WATER_Y+0.3||inMound(x,z)||inMound(ax,az)||inMound(bx,bz))continue;
+    if(trees.some(o=>distToSeg(o.x,o.z,ax,az,bx,bz)<1.1))continue;
+    logs.push({id:cx+','+cz+',l'+i,a:V(ax,ha+r*0.75,az),b:V(bx,hb+r*0.75,bz),r,top:Math.max(ha,hb)+r*1.7});
+  }
+  const bushes=[],nBush=Math.floor(rnd()*3.5);
+  for(let i=0;i<nBush;i++){
+    const x=ox+2+rnd()*(CHUNK-4),z=oz+2+rnd()*(CHUNK-4),h=local(x,z);
+    if(h<WATER_Y+0.8||forestDensity(x,z)<0.1||inMound(x,z))continue;
+    if(trees.some(o=>(o.x-x)**2+(o.z-z)**2<2.5))continue;
+    bushes.push({id:cx+','+cz+',b'+i,x,y:h,z});
+  }
+  // 바닥에 떨어진 물건: 나무 밑 막대기, 여기저기 조약돌 (바위 근처에 더 많음)
+  const items=[],ir=mulberry32(hash3(SEED+17,cx,cz));
+  const addIt=(type,x,z,extra)=>{
+    if(x<ox||x>=ox+CHUNK||z<oz||z>=oz+CHUNK)return;
+    const h=local(x,z);if(h<WATER_Y-0.1||inMound(x,z))return;
+    const id=cx+','+cz+','+items.length;
+    items.push(Object.assign({id,type,x,y:h,z,rot:ir()*6.2832,taken:TAKEN.has(id)},extra));
+  };
+  for(const t of trees){
+    const n=ir()<0.55?(ir()<0.3?2:1):0;     // 나무 하나에 55% 확률로 막대기 1~2개
+    for(let k=0;k<n;k++){const a=ir()*6.2832,d=0.7+ir()*2.3;addIt('stick',t.x+Math.cos(a)*d,t.z+Math.sin(a)*d,{len:0.5+ir()*0.4});}
+  }
+  const np=3+Math.floor(ir()*7);
+  for(let k=0;k<np;k++)addIt('pebble',ox+ir()*CHUNK,oz+ir()*CHUNK,{s:0.7+ir()*0.7});
+  for(const rk of rocks){const n=2+Math.floor(ir()*3);
+    for(let k=0;k<n;k++){const a=ir()*6.2832,d=rk.s*1.1+ir()*1.5;addIt('pebble',rk.x+Math.cos(a)*d,rk.z+Math.sin(a)*d,{s:0.7+ir()*0.7});}}
+  // 그늘진 곳(숲이 빽빽한 곳의 나무 밑, 죽은 통나무 옆)에 버섯
+  for(const t of trees){
+    if(ir()>forestDensity(t.x,t.z)*0.45)continue;
+    const n=1+Math.floor(ir()*3),red=ir()<0.15;
+    for(let k=0;k<n;k++){const a=ir()*6.2832,d=0.6+ir()*2;addIt(red?'mushroom_red':'mushroom_brown',t.x+Math.cos(a)*d,t.z+Math.sin(a)*d,{s:0.8+ir()*0.5});}
+  }
+  for(const l of logs){
+    if(ir()>0.6)continue;
+    const n=1+Math.floor(ir()*3),dx=l.b.x-l.a.x,dz=l.b.z-l.a.z,dl=Math.hypot(dx,dz);
+    for(let k=0;k<n;k++){const t=ir(),side=(ir()<0.5?-1:1)*(l.r+0.15+ir()*0.3);
+      addIt('mushroom_brown',l.a.x+dx*t-dz/dl*side,l.a.z+dz*t+dx/dl*side,{s:0.8+ir()*0.5});}
+  }
+  // 사과나무 밑에 떨어진 사과
+  for(const t of trees){
+    if(!t.apple||ir()>0.7)continue;
+    const n=1+Math.floor(ir()*2);
+    for(let k=0;k<n;k++){const a=ir()*6.2832,d=0.8+ir()*2;addIt('apple',t.x+Math.cos(a)*d,t.z+Math.sin(a)*d,{});}
+  }
+  const meshes=[terrain];
+  if(!rg.empty){const m=new THREE.Mesh(rg.build(),rockMat);m.castShadow=m.receiveShadow=true;meshes.push(m);}
+  for(const m of meshes)scene.add(m);
+  // 물가에 자라는 풀 (베면 풀 줄기 → 끈)
+  const reeds=[],rr=mulberry32(hash3(SEED+37,cx,cz));
+  for(let k=0;k<110;k++){
+    const x=ox+rr()*CHUNK,z=oz+rr()*CHUNK,s=0.8+rr()*0.5,rot=rr()*6.2832,h=local(x,z);
+    if(h<WATER_Y-0.5||h>WATER_Y+1.1)continue;
+    reeds.push({id:cx+','+cz+',r'+k,x,y:h,z,s,rot});
+  }
+  const c={cx,cz,hs,meshes,rockColliders,colliders:[],trees,logs,bushes,reeds,items,itemMeshes:null,grass:null,flora:[],vox:null,voxMesh:null};
+  chunks.set(cx+','+cz,c);
+  c.vox=genVoxels(c);buildVoxMesh(c);
+  buildFlora(c);return c;
+}
+function buildGrass(c){
+  const ox=c.cx*CHUNK,oz=c.cz*CHUNK,rnd=mulberry32(hash3(SEED+5,c.cx,c.cz)),MAX=4500;
+  const mesh=new THREE.InstancedMesh(grassGeo,grassMat,MAX);
+  const m=new THREE.Matrix4(),q=new THREE.Quaternion(),s=new THREE.Vector3(),p=new THREE.Vector3(),e=new THREE.Euler(),col=new THREE.Color();
+  let n=0;
+  for(let t=0;t<MAX;t++){
+    const lx=rnd()*CHUNK,lz=rnd()*CHUNK,a=rnd(),b=rnd(),cc=rnd(),x=ox+lx,z=oz+lz;
+    if(a>1-forestDensity(x,z)*0.65)continue;
+    const h=gridH(c.hs,lx/RES,lz/RES);if(h<WATER_Y+0.25)continue;
+    if(Math.abs(gridH(c.hs,(lx+0.75)/RES,lz/RES)-gridH(c.hs,(lx-0.75)/RES,lz/RES))>0.9)continue;
+    p.set(x,h-0.03,z);e.set(0,b*6.2832,0);q.setFromEuler(e);const sc=0.75+cc*0.6;s.set(sc,sc*(0.8+a*0.5),sc);
+    m.compose(p,q,s);mesh.setMatrixAt(n,m);
+    const v=nD(x/40,z/40)*0.5+0.5;col.setRGB(0.85+0.35*v,0.95+0.1*v,0.9+0.2*v);mesh.setColorAt(n,col);
+    n++;
+  }
+  mesh.count=n;mesh.instanceMatrix.needsUpdate=true;if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;
+  mesh.receiveShadow=true;mesh.frustumCulled=false;
+  scene.add(mesh);c.grass=mesh;
+}
+function removeGrass(c){scene.remove(c.grass);if(c.grass.dispose)c.grass.dispose();c.grass=null;}
+function unloadChunk(c){
+  for(const m of c.meshes){scene.remove(m);m.geometry.dispose();}
+  if(c.grass)removeGrass(c);
+  if(c.itemMeshes)removeItemMeshes(c);
+  clearFlora(c);
+  if(c.voxMesh){scene.remove(c.voxMesh);c.voxMesh.geometry.dispose();}
+  chunks.delete(c.cx+','+c.cz);
+}
+function updateChunks(){
+  const pcx=Math.floor(P.x/CHUNK),pcz=Math.floor(P.z/CHUNK);
+  for(const c of chunks.values())
+    if(Math.max(Math.abs(c.cx-pcx),Math.abs(c.cz-pcz))>VIEW_R+1)unloadChunk(c);
+  const t0=performance.now();
+  while(performance.now()-t0<6){
+    let best=null,bd=1e9;
+    for(let dz=-VIEW_R;dz<=VIEW_R;dz++)for(let dx=-VIEW_R;dx<=VIEW_R;dx++){
+      const d=dx*dx+dz*dz;if(d>(VIEW_R+0.5)**2||d>=bd)continue;
+      if(!chunks.has((pcx+dx)+','+(pcz+dz))){bd=d;best=[pcx+dx,pcz+dz];}
+    }
+    if(!best)break;buildChunk(best[0],best[1]);
+  }
+  let grassBuilt=false;
+  for(const c of chunks.values()){
+    const want=Math.max(Math.abs(c.cx-pcx),Math.abs(c.cz-pcz))<=GRASS_R;
+    if(want&&!c.grass&&!grassBuilt){buildGrass(c);grassBuilt=true;}
+    else if(!want&&c.grass)removeGrass(c);
+    if(want&&!c.itemMeshes)buildItemMeshes(c);
+    else if(!want&&c.itemMeshes)removeItemMeshes(c);
+  }
+}
+
+// ================= 플레이어 =================
+const P={x:0,y:0,z:0,vx:0,vz:0,vy:0,yaw:0,pitch:0,onGround:false,eye:1.65,bob:0,bobAmp:0,swim:false,run:false,mode:'서 있음'};
+const PR=0.35,GRAV=22;
+const keys={};
+function collideObjects(){
+  const pcx=Math.floor(P.x/CHUNK),pcz=Math.floor(P.z/CHUNK);
+  for(let dz=-1;dz<=1;dz++)for(let dx=-1;dx<=1;dx++){
+    const c=chunks.get((pcx+dx)+','+(pcz+dz));if(!c)continue;
+    for(const o of c.colliders){
+      if(o.top!==undefined&&P.y>o.top-0.1)continue;   // 낮은 것(그루터기·통나무)은 위로 뛰어넘을 수 있음
+      const ex=P.x-o.x,ez=P.z-o.z,r=o.r+PR,d2=ex*ex+ez*ez;
+      if(d2<r*r){const d=Math.sqrt(d2)||0.001;P.x=o.x+ex/d*r;P.z=o.z+ez/d*r;}
+    }
+  }
+}
+function tooSteep(ax,az,bx,bz){
+  const step=Math.hypot(bx-ax,bz-az);if(step<1e-5)return false;
+  return (groundH(bx,bz)-groundH(ax,az))/step>1.25;   // 약 51도보다 가파르면 못 올라감
+}
+// 몸통 상자가 블록과 겹치는지
+function boxHit(x,y,z,h){
+  const x0=Math.floor(x-PR),x1=Math.floor(x+PR),y0=Math.floor(y+0.001),y1=Math.floor(y+h-0.001),z0=Math.floor(z-PR),z1=Math.floor(z+PR);
+  for(let xx=x0;xx<=x1;xx++)for(let zz=z0;zz<=z1;zz++)for(let yy=y0;yy<=y1;yy++)if(getVox(xx,yy,zz))return true;
+  return false;
+}
+function cellsTop(x,z,ya,yb){             // ya~yb 사이에서 가장 높은 블록 윗면
+  let top=-Infinity;
+  for(let xx=Math.floor(x-PR);xx<=Math.floor(x+PR);xx++)for(let zz=Math.floor(z-PR);zz<=Math.floor(z+PR);zz++)
+    for(let yy=Math.floor(ya);yy<=Math.floor(yb);yy++)if(getVox(xx,yy,zz))top=Math.max(top,yy+1);
+  return top;
+}
+function cellsBottom(x,z,ya,yb){          // ya~yb 사이에서 가장 낮은 블록 아랫면
+  let bot=Infinity;
+  for(let xx=Math.floor(x-PR);xx<=Math.floor(x+PR);xx++)for(let zz=Math.floor(z-PR);zz<=Math.floor(z+PR);zz++)
+    for(let yy=Math.floor(ya);yy<=Math.floor(yb);yy++)if(getVox(xx,yy,zz))bot=Math.min(bot,yy);
+  return bot;
+}
+let flying=false;
+function updatePlayer(dt){
+  let crouch=!!keys.Shift&&!flying;
+  if(!crouch&&!flying&&boxHit(P.x,P.y,P.z,1.8))crouch=true;     // 낮은 굴에서는 일어설 수 없음
+  const h=crouch?1.35:1.8;
+  const fwd=(keys.KeyW?1:0)-(keys.KeyS?1:0),side=(keys.KeyD?1:0)-(keys.KeyA?1:0);
+  const wantRun=!!keys.Ctrl&&fwd>0&&!crouch;
+  const depth=WATER_Y-P.y;               // 발이 물에 잠긴 깊이
+  P.swim=!flying&&depth>1.25;
+  let speed=crouch?1.8:wantRun?6.8:4.2;
+  if(flying)speed=wantRun?22:10;
+  else{if(depth>0.4)speed*=P.swim?0.5:0.7;speed*=speedMul;}   // 짐이 무거울수록 조금씩 느려짐
+  const sy=Math.sin(P.yaw),cy=Math.cos(P.yaw);
+  let wx=-sy*fwd+cy*side,wz=-cy*fwd-sy*side;const wl=Math.hypot(wx,wz);
+  if(wl>0){wx=wx/wl*speed;wz=wz/wl*speed;}
+  const k=Math.min(1,((P.onGround||P.swim||flying)?14:2.5)*dt);
+  P.vx+=(wx-P.vx)*k;P.vz+=(wz-P.vz)*k;
+  let nx=P.x+P.vx*dt,nz=P.z+P.vz*dt;
+  if(P.onGround&&!P.swim&&!flying&&tooSteep(P.x,P.z,nx,nz)){
+    if(!tooSteep(P.x,P.z,nx,P.z))nz=P.z;
+    else if(!tooSteep(P.x,P.z,P.x,nz))nx=P.x;
+    else{nx=P.x;nz=P.z;P.vx*=0.3;P.vz*=0.3;}
+  }
+  if(boxHit(nx,P.y,P.z,h)){nx=P.x;P.vx=0;}
+  if(boxHit(nx,P.y,nz,h)){nz=P.z;P.vz=0;}
+  P.x=nx;P.z=nz;collideObjects();
+
+  if(flying)P.vy=((keys.Space?1:0)-(keys.Shift?1:0))*(wantRun?14:8);
+  else if(P.swim){P.vy+=((depth-1.35)*8+(keys.Space?5:0))*dt;P.vy*=Math.exp(-3*dt);}
+  else{
+    P.vy-=GRAV*dt;
+    if(keys.Space&&P.onGround){P.vy=crouch?5:6.4;P.onGround=false;}
+  }
+  P.vy=Math.max(P.vy,-25);
+  const vyBefore=P.vy;
+  let ny=P.y+P.vy*dt,landed=false;
+  if(P.vy<0){const top=cellsTop(P.x,P.z,ny,P.y+0.2);if(top>ny-0.001&&top<=P.y+0.25){ny=top;P.vy=0;landed=true;}}
+  else if(P.vy>0){const bot=cellsBottom(P.x,P.z,P.y+h,ny+h);if(bot<ny+h){ny=bot-h-0.001;P.vy=0;}}
+  const g=groundH(P.x,P.z);
+  if(ny<=g){ny=g;if(P.vy<0)P.vy=0;landed=true;}
+  else if(!landed&&P.onGround&&P.vy<=0&&!flying&&ny-g<0.4&&cellsTop(P.x,P.z,ny-0.6,ny)<ny-0.5){ny=g;P.vy=0;landed=true;}  // 내리막에서 땅에 붙어 걷기
+  // 높은 곳에서 떨어지면 다침 (물에 떨어지면 괜찮음)
+  if(landed&&!P.onGround&&vyBefore<-13&&!flying&&depth<0.5)hurt(Math.round((-vyBefore-13)*5),'높은 곳에서 떨어졌어요!');
+  P.y=ny;P.onGround=landed&&!flying;
+
+  P.eye+=((crouch?1.12:1.65)-P.eye)*Math.min(1,10*dt);
+  const hs=Math.hypot(P.vx,P.vz);
+  if(P.onGround&&hs>0.5)P.bob+=dt*hs*1.9;
+  P.bobAmp+=((P.onGround&&hs>0.5?Math.min(1,hs/4):0)-P.bobAmp)*Math.min(1,8*dt);
+  P.run=wantRun&&hs>3;
+  P.mode=flying?'날기':P.swim?'수영':crouch?'웅크리기':P.run?'달리기':hs>0.5?'걷기':'서 있음';
+}
+function updateCamera(dt){
+  camera.position.set(P.x,P.y+P.eye+Math.sin(P.bob*2)*0.035*P.bobAmp,P.z);
+  camera.rotation.set(P.pitch,P.yaw,0);
+  const fov=P.run?80:72;
+  if(Math.abs(camera.fov-fov)>0.05){camera.fov+=(fov-camera.fov)*Math.min(1,6*dt);camera.updateProjectionMatrix();}
+}
+
+// ================= 낮과 밤 =================
+let gameTime=0.29;   // 0 = 첫날 자정, 0.29 = 아침 7시쯤
+const sunDir=new THREE.Vector3(),moonDir=new THREE.Vector3(),lightDir=new THREE.Vector3();
+const SKY={dayTop:new THREE.Color(0x3a78c9),dayHor:new THREE.Color(0xb4cfe3),duskTop:new THREE.Color(0x3b4a78),duskHor:new THREE.Color(0xe39a68),nightTop:new THREE.Color(0x03060f),nightHor:new THREE.Color(0x0c1424)};
+const HEMI={day:new THREE.Color(0xc4d8ee),night:new THREE.Color(0x33405a),gDay:new THREE.Color(0x4d4330),gNight:new THREE.Color(0x111111)};
+const UNDERWATER=new THREE.Color(0x16404a);
+const cTop=new THREE.Color(),cHor=new THREE.Color();
+function updateSky(){
+  const f=((gameTime%1)+1)%1,th=(f-0.25)*Math.PI*2;
+  sunDir.set(Math.cos(th)*0.85,Math.sin(th),0.38).normalize();
+  moonDir.copy(sunDir).negate();
+  const e=sunDir.y,day=smooth(-0.12,0.25,e),dusk=Math.max(0,1-Math.abs(e+0.02)/0.22);
+  cTop.copy(SKY.nightTop).lerp(SKY.dayTop,day).lerp(SKY.duskTop,dusk*0.5);
+  cHor.copy(SKY.nightHor).lerp(SKY.dayHor,day).lerp(SKY.duskHor,dusk*0.75);
+  skyU.top.value.copy(cTop);skyU.horizon.value.copy(cHor);skyU.sunDir.value.copy(sunDir);
+  skyU.sunCol.value.setRGB(1,0.7+0.25*day,0.45+0.4*day);skyU.sunVis.value=smooth(-0.1,0.02,e);
+
+  const sunI=smooth(-0.04,0.3,e);
+  if(e>-0.04){lightDir.copy(sunDir);sun.color.setRGB(1,0.72+0.28*sunI,0.5+0.45*sunI);sun.intensity=1.05*sunI;}
+  else{lightDir.copy(moonDir);sun.color.setHex(0x8a9acc);sun.intensity=0.25*smooth(-0.04,-0.25,e);}
+  hemi.intensity=0.14+0.46*day;
+  hemi.color.copy(HEMI.night).lerp(HEMI.day,day);hemi.groundColor.copy(HEMI.gNight).lerp(HEMI.gDay,day);
+
+  const sx=Math.round(P.x),sz=Math.round(P.z);
+  sun.position.set(sx+lightDir.x*110,P.y+lightDir.y*110,sz+lightDir.z*110);sun.target.position.set(sx,P.y,sz);
+
+  stars.material.opacity=smooth(0.05,-0.2,e);
+  stars.position.copy(camera.position);stars.rotation.y=f*6.2832*0.25;
+  sky.position.copy(camera.position);
+  moon.visible=moonDir.y>-0.1;
+  moon.position.copy(camera.position).addScaledVector(moonDir,420);moon.lookAt(camera.position);
+  moon.material.opacity=0.35+0.65*smooth(0.2,-0.1,e);
+
+  water.position.x=P.x;water.position.z=P.z;
+  water.material.color.setRGB(0.06+0.11*day,0.13+0.22*day,0.17+0.23*day);
+  if(camera.position.y<WATER_Y){scene.fog.color.copy(UNDERWATER).multiplyScalar(0.3+0.7*day);scene.fog.near=0.5;scene.fog.far=22;}
+  else{scene.fog.color.copy(cHor);scene.fog.near=FOG_NEAR;scene.fog.far=FOG_FAR;}
+}
+
+// ================= 화면 글자 =================
+const $=id=>document.getElementById(id);
+const pad=n=>String(n).padStart(2,'0');
+let fps=0,fpsN=0,fpsT=0;
+// 상태 수치 (지금은 보여 주기만 함 · 줄어들고 채우는 건 4단계)
+const S={hp:100,hunger:100,thirst:100,body:36.5};
+function ambientTemp(){
+  let t=9+10*smooth(-0.2,0.6,sunDir.y);          // 낮 19도, 밤 9도쯤
+  t-=Math.max(0,P.y-15)*0.08;                      // 높은 곳은 더 추움
+  if(camera.position.y<WATER_Y+0.3)t-=4;           // 물속
+  return t;
+}
+let hudLast='';
+function updateHUD(){
+  const f=((gameTime%1)+1)%1,hh=Math.floor(f*24),mm=Math.floor((f*24-hh)*60),night=hh>=19||hh<5;
+  $('clock').textContent=`${night?'🌙':'☀️'} ${Math.floor(gameTime)+1}일째 · ${pad(hh)}:${pad(mm)}`;
+  $('info').textContent=`X ${Math.round(P.x)} · Z ${Math.round(P.z)} · 높이 ${Math.round(P.y)} · ${fps} FPS`;
+  $('state').textContent=(admin?'🛠 관리자 · ':'')+P.mode+(keys.KeyT?' · ⏩ 시간 빨리 감기':'');
+  $('fsWarn').style.display=document.fullscreenElement?'none':'block';
+  const air=Math.round(ambientTemp());
+  const key=[Math.round(S.hp),Math.round(S.hunger),Math.round(S.thirst),S.body.toFixed(1),air].join('|');
+  if(key===hudLast)return;hudLast=key;
+  let h='';for(let i=0;i<10;i++){const v=S.hp/10-i;h+=`<span class="h${v>=1?'':v>=0.5?' half':' empty'}">♥</span>`;}
+  $('hearts').innerHTML=h;
+  $('fHunger').style.width=S.hunger+'%';$('tHunger').textContent=Math.round(S.hunger);
+  $('fThirst').style.width=S.thirst+'%';$('tThirst').textContent=Math.round(S.thirst);
+  const bc=S.body<35.5?'#7fb6ff':S.body>37.8?'#ff8a6a':'#e8eadf';
+  $('tTemp').innerHTML=`🌡 체온 <b style="color:${bc}">${S.body.toFixed(1)}°C</b> · 기온 ${air}°C`;
+}
+
+// ================= 인벤토리 (30칸, 1~10번 칸이 핫바) + 제작대 4×4 + 화로 =================
+const inv=new Array(30).fill(null),craft=new Array(16).fill(null);
+let sel=0,held=null,hover=null,invOpen=false,speedMul=1,invWeight=0,craftRec=null,curFurn=null,admin=false;
+function mkStack(type,n,dur){const s={type,n};if(ITEMS[type].dur)s.dur=dur??ITEMS[type].dur;return s;}
+function addItem(type,n,dur){                    // 다 못 넣으면 남은 개수를 돌려줌
+  const st=ITEMS[type].stack;
+  if(st>1)for(let i=0;i<30&&n>0;i++){const s=inv[i];if(s&&s.type===type&&s.n<st){const k=Math.min(st-s.n,n);s.n+=k;n-=k;}}
+  for(let i=0;i<30&&n>0;i++)if(!inv[i]){const k=Math.min(st,n);inv[i]=mkStack(type,k,dur);n-=k;}
+  invChanged();return n;
+}
+function invChanged(){
+  invWeight=0;
+  for(const s of inv)if(s)invWeight+=s.n*ITEMS[s.type].w;
+  for(const s of craft)if(s)invWeight+=s.n*ITEMS[s.type].w;
+  if(held)invWeight+=held.n*ITEMS[held.type].w;
+  speedMul=1-Math.min(0.3,invWeight*0.004);        // 1kg 마다 0.4% 느려짐, 최대 30%
+  craftRec=matchRecipe();
+  renderSlots();
+}
+// 제작대에 놓은 것이 조합법과 맞는지 확인
+function matchRecipe(){
+  let r0=4,r1=-1,c0=4,c1=-1;
+  for(let r=0;r<4;r++)for(let c=0;c<4;c++)if(craft[r*4+c]){r0=Math.min(r0,r);r1=Math.max(r1,r);c0=Math.min(c0,c);c1=Math.max(c1,c);}
+  if(r1<0)return null;
+  const h=r1-r0+1,w=c1-c0+1;
+  for(const rec of RECIPES){                       // 모양대로 놓는 조합법 (위치 자유, 좌우 뒤집기 가능)
+    if(!rec.shape||rec.shape.length!==h||rec.shape[0].length!==w)continue;
+    for(const mirror of [false,true]){
+      let ok=true;
+      for(let r=0;r<h&&ok;r++)for(let c=0;c<w;c++){
+        const ch=rec.shape[r][mirror?w-1-c:c],need=ch===' '?null:rec.key[ch],cell=craft[(r0+r)*4+c0+c];
+        if((cell?cell.type:null)!==need){ok=false;break;}
+      }
+      if(ok)return rec;
+    }
+  }
+  const cnt={};for(const s of craft)if(s)cnt[s.type]=(cnt[s.type]||0)+1;   // 개수만 맞추는 조합법 (한 칸에 1개씩 셈)
+  for(const rec of RECIPES){
+    if(!rec.need)continue;const ks=Object.keys(rec.need);
+    if(ks.length===Object.keys(cnt).length&&ks.every(k=>cnt[k]===rec.need[k]))return rec;
+  }
+  return null;
+}
+function slotHTML(s,keyLabel){
+  const k=keyLabel?`<span class="k">${keyLabel}</span>`:'';
+  if(!s)return k;
+  const it=ITEMS[s.type];let h=k+`<img src="${it.icon}">`+(s.n>1?`<span class="n">${s.n}</span>`:'');
+  if(it.dur){const p=s.dur/it.dur;h+=`<div class="dur"><div style="width:${p*100}%;background:${p>0.5?'#6c4':p>0.2?'#db3':'#d43'}"></div></div>`;}
+  return h;
+}
+const hotEls=[],invEls=[],craftEls=[],furnEls=[];
+function makeSlot(parent,getArr,i,opt){
+  const d=document.createElement('div');d.className='slot';parent.appendChild(d);
+  d.addEventListener('mousedown',e=>{e.stopPropagation();slotClick(getArr(),i,e.button,opt);});
+  d.addEventListener('mouseenter',()=>{hover={arr:getArr(),i};showSlotInfo();});
+  d.addEventListener('mouseleave',()=>{hover=null;showSlotInfo();});
+  return d;
+}
+function renderRecipes(){
+  let html='',cat='';
+  const img=k=>`<img src="${ITEMS[k].icon}" title="${ITEMS[k].name}">`;
+  for(const rec of RECIPES){
+    if(rec.cat!==cat){cat=rec.cat;html+=`<div class="rcat">${cat}</div>`;}
+    const name=`→ ${ITEMS[rec.out].name}${rec.n>1?' ×'+rec.n:''}`;let cells='';
+    if(rec.shape){
+      for(const row of rec.shape)for(const ch of row)cells+=ch===' '?'<span></span>':img(rec.key[ch]);
+      html+=`<div class="rec"><div class="mini" style="grid-template-columns:repeat(${rec.shape[0].length},16px)">${cells}</div><span>${name}</span></div>`;
+    }else{
+      for(const [k,n] of Object.entries(rec.need))cells+=`<span class="need">${img(k)}${n>1?'×'+n:''}</span>`;
+      html+=`<div class="rec"><div class="needs">${cells}</div><span>${name}</span></div>`;
+    }
+  }
+  html+='<div class="rcat">화로에서 녹이기 (연료 필요)</div>';
+  for(const r of SMELT)html+=`<div class="rec"><div class="needs"><span class="need">${img(r.a)}</span>${r.b?'<span class="need">+'+img(r.b)+'</span>':''}</div><span>→ ${ITEMS[r.out].name}${r.n>1?' ×'+r.n:''}${r.blast?' (용광로만)':''}</span></div>`;
+  $('recipeList').innerHTML=html;
+}
+(function buildSlots(){
+  for(let i=0;i<10;i++){const d=document.createElement('div');d.className='slot';$('hotbar').appendChild(d);hotEls.push(d);}
+  const grid=$('invGrid'),I=()=>inv,Cr=()=>craft,F=()=>curFurn.slots;
+  for(let i=10;i<30;i++)invEls[i]=makeSlot(grid,I,i);
+  const sp=document.createElement('div');sp.className='sep';grid.appendChild(sp);
+  for(let i=0;i<10;i++)invEls[i]=makeSlot(grid,I,i);
+  for(let i=0;i<16;i++)craftEls[i]=makeSlot($('craftGrid'),Cr,i);
+  for(let i=0;i<4;i++)furnEls[i]=makeSlot($('fs'+i),F,i,{outOnly:i===3});
+  $('craftOut').addEventListener('mousedown',e=>{e.stopPropagation();takeCraft();});
+  renderRecipes();
+})();
+function renderSlots(){
+  for(let i=0;i<10;i++){hotEls[i].innerHTML=slotHTML(inv[i],String((i+1)%10));hotEls[i].classList.toggle('sel',i===sel);}
+  for(let i=0;i<30;i++){invEls[i].innerHTML=slotHTML(inv[i],i<10?String((i+1)%10):'');invEls[i].classList.toggle('sel',i===sel);}
+  for(let i=0;i<16;i++)craftEls[i].innerHTML=slotHTML(craft[i]);
+  $('craftOut').innerHTML=craftRec?slotHTML(mkStack(craftRec.out,craftRec.n)):'';
+  $('craftOut').classList.toggle('ready',!!craftRec);
+  if(curFurn){for(let i=0;i<4;i++)furnEls[i].innerHTML=slotHTML(curFurn.slots[i]);curFurn.dirty=false;renderFurnBars();}
+  const hd=$('held');hd.innerHTML=held?slotHTML(held):'';hd.style.display=held?'block':'none';
+  showSlotInfo();
+}
+function renderFurnBars(){
+  const f=curFurn,r=smeltRec(f);
+  $('fFlame').style.width=(f.burn>0?f.burn/f.burnMax*100:0)+'%';
+  $('fProg').style.width=(r?Math.min(1,f.prog/r.time)*100:0)+'%';
+  $('fState').textContent=!r?'녹일 수 있는 재료를 넣어요':f.burn>0?`${ITEMS[r.out].name} 만드는 중…`:'연료를 넣어요 (석탄·숯·통나무·판자·막대기)';
+}
+function showSlotInfo(){
+  const base=`무게 ${invWeight.toFixed(1)}kg · 이동 속도 -${Math.round((1-speedMul)*100)}%`;
+  const s=hover?hover.arr[hover.i]:null;
+  let txt=base;
+  if(s){const it=ITEMS[s.type];
+    txt=`${it.name} ×${s.n} (${(s.n*it.w).toFixed(1)}kg)`+(it.dur?` · 내구도 ${s.dur}/${it.dur}`:'')+(it.dmg?` · 공격력 ${it.dmg}`:'')+(FUEL[s.type]?` · 연료 ${FUEL[s.type]}초`:'')+' · '+base;}
+  $('invInfo').textContent=txt;
+}
+function slotClick(arr,i,btn,opt){
+  const s=arr[i];
+  if(opt&&opt.outOnly){                           // 결과 칸은 꺼내기만 됨
+    if(!s)return;
+    if(!held){held=s;arr[i]=null;}
+    else if(held.type===s.type&&held.n+s.n<=ITEMS[s.type].stack){held.n+=s.n;arr[i]=null;}
+    invChanged();return;
+  }
+  if(btn===0){
+    if(!held){if(s){held=s;arr[i]=null;}}
+    else if(!s){arr[i]=held;held=null;}
+    else if(s.type===held.type&&ITEMS[s.type].stack>1){const k=Math.min(ITEMS[s.type].stack-s.n,held.n);s.n+=k;held.n-=k;if(held.n<=0)held=null;}
+    else{arr[i]=held;held=s;}
+  }else if(btn===2){
+    if(!held){if(s){if(s.n===1){held=s;arr[i]=null;}else{const h=Math.ceil(s.n/2);held=mkStack(s.type,h);s.n-=h;}}}
+    else if(!s){if(held.n===1){arr[i]=held;held=null;}else{arr[i]=mkStack(held.type,1);held.n--;}}
+    else if(s.type===held.type&&s.n<ITEMS[s.type].stack){s.n++;if(!--held.n)held=null;}
+  }
+  invChanged();
+}
+function takeCraft(){
+  const rec=craftRec;if(!rec)return;
+  if(held&&(held.type!==rec.out||held.n+rec.n>ITEMS[rec.out].stack))return;
+  for(let i=0;i<16;i++){const s=craft[i];if(s&&!(rec.keep&&rec.keep.includes(s.type))){s.n--;if(!s.n)craft[i]=null;}}
+  if(held)held.n+=rec.n;else held=mkStack(rec.out,rec.n);
+  toast(`${ITEMS[rec.out].name} ${rec.n}개를 만들었어요`);invChanged();
+}
+function dropFromSlot(arr,i,n){
+  const s=arr[i];if(!s)return;
+  const k=Math.min(n,s.n);s.n-=k;if(!s.n)arr[i]=null;
+  spawnDrop(s.type,k,s.dur);invChanged();toast(`${ITEMS[s.type].name} ${k}개를 버렸어요`);
+}
+function selectSlot(i){sel=i;renderSlots();if(inv[i])toast(ITEMS[inv[i].type].name);}
+function openInv(furnKey){
+  curFurn=furnKey?FURN.get(furnKey):null;
+  $('craftRow').style.display=curFurn?'none':'flex';$('furnRow').style.display=curFurn?'flex':'none';
+  $('invTitle').textContent=curFurn?(curFurn.blast?'용광로':'화로'):'인벤토리';
+  $('adminRow').style.display=admin&&!curFurn?'block':'none';
+  invOpen=true;mouseDown=false;for(const k in keys)keys[k]=false;
+  $('inv').style.display='flex';$('prompt').style.display='none';
+  document.exitPointerLock();renderSlots();
+}
+function openFurnace(k){if(!FURN.has(k)){const p=k.split(',');FURN.set(k,newFurnace(getVox(+p[0],+p[1],+p[2])===12));}openInv(k);}
+function giveBack(s){const left=addItem(s.type,s.n,s.dur);if(left>0)spawnDrop(s.type,left,s.dur);}
+function closeInv(){
+  invOpen=false;$('inv').style.display='none';
+  for(let i=0;i<16;i++)if(craft[i]){const s=craft[i];craft[i]=null;giveBack(s);}   // 제작대에 남은 것은 가방으로
+  if(held){const s=held;held=null;giveBack(s);}
+  curFurn=null;invChanged();hover=null;lockPointer();
+}
+$('inv').addEventListener('mousedown',e=>{       // 창 밖을 클릭하면 들고 있던 것을 버림
+  if(e.target!==$('inv')||!held)return;
+  spawnDrop(held.type,held.n,held.dur);toast(`${ITEMS[held.type].name} ${held.n}개를 버렸어요`);held=null;invChanged();
+});
+addEventListener('mousemove',e=>{if(held){const hd=$('held');hd.style.left=(e.clientX-20)+'px';hd.style.top=(e.clientY-20)+'px';}});
+addEventListener('contextmenu',e=>e.preventDefault());
+// 관리자: 모든 아이템 칸
+function buildAdminGrid(){
+  const g=$('adminGrid');if(g.children.length)return;
+  for(const id in ITEMS){
+    const d=document.createElement('div');d.className='slot';d.title=ITEMS[id].name;d.innerHTML=`<img src="${ITEMS[id].icon}">`;
+    d.addEventListener('mousedown',e=>{e.stopPropagation();const n=ITEMS[id].stack,left=addItem(id,n);
+      toast(left===n?'인벤토리가 가득 찼어요':`${ITEMS[id].name} ${n-left}개를 꺼냈어요`);});
+    d.addEventListener('mouseenter',()=>{$('invInfo').textContent=`${ITEMS[id].name} · 클릭하면 한 묶음(${ITEMS[id].stack}개)을 꺼내요`;});
+    g.appendChild(d);
+  }
+}
+
+// ================= 손에 든 물건 =================
+scene.add(camera);
+const hand=new THREE.Group();hand.position.set(0.32,-0.3,-0.5);camera.add(hand);
+let handType=null,swingT=0;
+function updateHand(dt){
+  const s=inv[sel],type=s?s.type:null;
+  if(type!==handType){
+    handType=type;while(hand.children.length)hand.remove(hand.children[0]);
+    if(type){
+      const it=ITEMS[type],geo=it.tool?it.handGeo:type==='torch'?torchItemGeo:it.place?blockGeo(it.place,0.22):ITEM_MESH[type].geo;
+      const m=new THREE.Mesh(geo,ITEM_MESH[type].mat);
+      if(it.tool||type==='torch'){m.position.set(0,it.tool==='spear'?-0.5:-0.2,0);m.rotation.set(-0.2,0.5,0.25);}
+      else if(it.place)m.rotation.set(0.3,0.6,0);
+      else{m.scale.setScalar(type==='log'?0.6:1.6);m.rotation.set(0.4,0.6,0);}
+      hand.add(m);
+    }
+  }
+  swingT=Math.max(0,swingT-dt*3.2);const k=Math.sin(swingT*Math.PI);
+  hand.rotation.set(-k*1.1,0,k*0.25);
+  hand.position.y=-0.3+Math.sin(P.bob*2)*0.012*P.bobAmp;
+}
+function swing(){swingT=1;}
+
+// ================= 바라보는 것 찾기와 좌클릭·우클릭 행동 =================
+let target=null,mouseDown=false,actCD=0,mine={key:'',hits:0};
+const _dir=new THREE.Vector3();
+function raySeg(o,d,ax,ay,az,bx,by,bz){   // 시선과 선분 사이 가장 가까운 거리, 시선 방향 거리
+  const vx=bx-ax,vy=by-ay,vz=bz-az,wx=o.x-ax,wy=o.y-ay,wz=o.z-az;
+  const b=d.x*vx+d.y*vy+d.z*vz,c=vx*vx+vy*vy+vz*vz,dd=d.x*wx+d.y*wy+d.z*wz,e=vx*wx+vy*wy+vz*wz,D=c-b*b;
+  let tc=D<1e-6?0:(e-b*dd)/D;tc=Math.max(0,Math.min(1,tc));
+  const sc=Math.max(0,b*tc-dd);
+  return [Math.hypot(o.x+d.x*sc-ax-vx*tc,o.y+d.y*sc-ay-vy*tc,o.z+d.z*sc-az-vz*tc),sc];
+}
+function terrainRay(o,d,max){
+  let prev=0;
+  for(let t=0.3;t<=max;t+=0.1){
+    if(o.y+d.y*t<=groundH(o.x+d.x*t,o.z+d.z*t)){
+      let a=prev,b=t;for(let k=0;k<6;k++){const m=(a+b)/2;if(o.y+d.y*m<=groundH(o.x+d.x*m,o.z+d.z*m))b=m;else a=m;}
+      return {x:o.x+d.x*b,y:o.y+d.y*b,z:o.z+d.z*b,t:b};
+    }
+    prev=t;
+  }
+  return null;
+}
+function heldItem(){const s=inv[sel];return s?ITEMS[s.type]:null;}
+function findTarget(){
+  const o=camera.position;camera.getWorldDirection(_dir);
+  let best=null,bt=4.5;
+  const pick=(kind,obj,c,t,max)=>{if(t<bt&&t<=max){bt=t;best={kind,obj,c,t};}};
+  const vh=voxRay(o,_dir,4.5);if(vh)pick('block',vh,null,vh.t,4.5);
+  const testItem=(it,c)=>{
+    const vx=it.x-o.x,vy=it.y+0.05-o.y,vz=it.z-o.z,t=vx*_dir.x+vy*_dir.y+vz*_dir.z;
+    if(t>0&&vx*vx+vy*vy+vz*vz-t*t<0.09)pick('item',it,c,t,3);
+  };
+  const pcx=Math.floor(P.x/CHUNK),pcz=Math.floor(P.z/CHUNK);
+  for(let dz=-1;dz<=1;dz++)for(let dx=-1;dx<=1;dx++){
+    const c=chunks.get((pcx+dx)+','+(pcz+dz));if(!c)continue;
+    if(c.itemMeshes)for(const it of c.items)if(!it.taken)testItem(it,c);
+    for(const t of c.trees){
+      if(stOf(t.id).chopped||(t.x-o.x)**2+(t.z-o.z)**2>25)continue;
+      const [d,tt]=raySeg(o,_dir,t.x,t.y-0.3,t.z,t.x,t.y+3.5,t.z);
+      if(d<(t.rad||0.3)+0.12)pick('tree',t,c,tt,3.2);
+    }
+    for(const l of c.logs){
+      if(stOf(l.id).gone)continue;
+      const [d,tt]=raySeg(o,_dir,l.a.x,l.a.y,l.a.z,l.b.x,l.b.y,l.b.z);
+      if(d<l.r+0.1)pick('log',l,c,tt,3.2);
+    }
+    for(const b of c.bushes){
+      if(stOf(b.id).picked)continue;
+      const vx=b.x-o.x,vy=b.y+0.45-o.y,vz=b.z-o.z,t=vx*_dir.x+vy*_dir.y+vz*_dir.z;
+      if(t>0&&vx*vx+vy*vy+vz*vz-t*t<0.36)pick('bush',b,c,t,3.2);
+    }
+    for(const r of c.reeds){
+      if(stOf(r.id).picked||(r.x-o.x)**2+(r.z-o.z)**2>16)continue;
+      const [d,tt]=raySeg(o,_dir,r.x,r.y,r.z,r.x,r.y+1.1*r.s,r.z);
+      if(d<0.3)pick('reed',r,c,tt,3.2);
+    }
+  }
+  for(const d of dropped)testItem(d,null);
+  for(const tc of TORCHES){const vx=tc.x-o.x,vy=tc.y+0.35-o.y,vz=tc.z-o.z,t=vx*_dir.x+vy*_dir.y+vz*_dir.z;
+    if(t>0&&vx*vx+vy*vy+vz*vz-t*t<0.06)pick('torch',tc,null,t,3.5);}
+  const it=heldItem();
+  if(it&&(it.tool==='shovel'||it.place||it.torch)){const th=terrainRay(o,_dir,Math.min(bt,4.5));if(th)pick('ground',th,null,th.t,4.5);}
+  return best;
+}
+function toolPower(kind){const it=heldItem();if(admin)return 99;return it&&it.tool===kind?it.power:0;}
+function blockHits(b){const B=BLOCKS[b],it=heldItem();
+  if(admin)return 1;
+  if(!it||it.tool!==B.tool||it.tier<B.tier)return 0;
+  return Math.max(1,Math.ceil(B.hard/it.power));}
+const needText=B=>`${TIER_NAME[B.tier]} ${TOOL_NAME[B.tool]} 이상이 필요해요`;
+function promptText(tg){
+  const it=heldItem(),place=it&&(it.place||it.torch)?` · [우클릭] ${it.name} 놓기`:'';
+  switch(tg.kind){
+    case 'item':{const o=tg.obj;return `[좌클릭] ${ITEMS[o.type].name}${o.n>1?' ×'+o.n:''} 줍기`;}
+    case 'bush':return '[좌클릭] 블루베리 따기';
+    case 'reed':return '[좌클릭] 물가 풀 베기 (풀 줄기)';
+    case 'torch':return '[좌클릭] 횃불 떼기';
+    case 'ground':return (it&&it.tool==='shovel'?'[좌클릭] 땅 파기':'')+(place?(it.tool?' · ':'')+place.slice(3):'');
+    case 'block':{
+      const h=tg.obj,B=BLOCKS[h.b],n=blockHits(h.b),done=mine.key===vkey(h.x,h.y,h.z)?mine.hits:0;
+      let s=n?`[좌클릭] ${B.name} 캐기 (${done}/${n})`:`${B.name} · ${needText(B)}`;
+      if(h.b===11||h.b===12)return `[우클릭] ${B.name} 열기 · `+s;
+      return s+place;
+    }
+    case 'tree':{
+      const t=tg.obj,s=stOf(t.id),nm=treeName(t),pw=toolPower('axe');
+      if(pw){const need=Math.ceil(TREE_HP[t.type]/pw);return `[좌클릭] ${nm} 베기 (${Math.min(need,s.hits||0)}/${need})`;}
+      if(t.apple){const a=s.apples??t.appleMax;return a>0?`[좌클릭] 사과나무 흔들기 (사과 ${a}개)`:'사과나무 · 사과가 없어요';}
+      return `${nm} · 도끼가 있어야 벨 수 있어요`;
+    }
+    case 'log':{const pw=toolPower('axe');if(!pw)return '죽은 통나무 · 도끼가 있어야 자를 수 있어요';
+      const need=Math.ceil(3/pw);return `[좌클릭] 죽은 통나무 자르기 (${stOf(tg.obj.id).hits||0}/${need})`;}
+  }
+  return '';
+}
+function useTool(){
+  if(admin)return;
+  const s=inv[sel];if(!s||!s.dur)return;
+  s.dur--;if(s.dur<=0){inv[sel]=null;toast(`${ITEMS[s.type].name}이(가) 부러졌어요`);}
+  invChanged();
+}
+function consumeSel(){const s=inv[sel];if(!s)return;s.n--;if(!s.n)inv[sel]=null;invChanged();}
+function pickup(it){
+  const name=ITEMS[it.type].name;
+  if(it.id){                                       // 원래 바닥에 있던 물건
+    if(addItem(it.type,1)>0){toast('인벤토리가 가득 찼어요');return;}
+    it.taken=true;TAKEN.add(it.id);
+    if(it.mesh){it.mesh.setMatrixAt(it.inst,ZERO_M);it.mesh.instanceMatrix.needsUpdate=true;}
+    toast(`+1 ${name}`);
+  }else{                                           // 버리거나 떨어진 물건
+    const left=addItem(it.type,it.n,it.dur),got=it.n-left;
+    if(!got){toast('인벤토리가 가득 찼어요');return;}
+    if(left>0)it.n=left;else{scene.remove(it.mesh);dropped.splice(dropped.indexOf(it),1);}
+    toast(`+${got} ${name}`);
+  }
+  target=null;
+}
+// 삽으로 땅 파기 (가까운 땅 꼭짓점을 조금씩 낮춤, 최대 2m)
+function digAt(px,pz){
+  if(moundColumn(Math.floor(px),Math.floor(pz))){toast('바위 지대는 곡괭이로 캐야 해요');return false;}
+  const ix=Math.round(px/RES),iz=Math.round(pz/RES),k=ix+','+iz,cur=DIG.get(k)||0;
+  if(cur<=-2){toast('더 깊이는 못 파요. 땅이 너무 단단해요');return false;}
+  const nv=Math.max(-2,cur-0.35);DIG.set(k,nv);
+  for(const [a,b] of [[1,0],[-1,0],[0,1],[0,-1]]){const kk=(ix+a)+','+(iz+b);DIG.set(kk,Math.min(DIG.get(kk)||0,nv*0.5));}
+  const done=new Set();
+  for(let a=-2;a<=2;a++)for(let b=-2;b<=2;b++){
+    const ck=Math.floor((ix+a)/SEG)+','+Math.floor((iz+b)/SEG);if(done.has(ck))continue;done.add(ck);
+    const c=chunks.get(ck);if(c)rebuildTerrain(c);
+  }
+  return true;
+}
+function doAction(){
+  const tg=target;if(actCD>0)return;
+  if(!tg){swing();actCD=0.35;return;}                 // 허공에 휘두르기
+  const it=heldItem();
+  switch(tg.kind){
+    case 'item':pickup(tg.obj);actCD=0.2;return;
+    case 'bush':{
+      const b=tg.obj,n=3+Math.floor(Math.random()*3),left=addItem('blueberry',n);actCD=0.4;
+      if(left===n){toast('인벤토리가 가득 찼어요');return;}
+      st(b.id).picked=true;buildFlora(tg.c);swing();toast(`+${n-left} 블루베리`);return;
+    }
+    case 'reed':{
+      const r=tg.obj,n=2+Math.floor(Math.random()*2),left=addItem('fiber',n);actCD=0.3;
+      if(left===n){toast('인벤토리가 가득 찼어요');return;}
+      st(r.id).picked=true;buildFlora(tg.c);swing();toast(`+${n-left} 풀 줄기`);return;
+    }
+    case 'torch':{
+      const tc=tg.obj;TORCHES.splice(TORCHES.indexOf(tc),1);scene.remove(tc.g);
+      if(addItem('torch',1))spawnDropAt('torch',1,tc.x,tc.z,undefined,tc.y);
+      toast('+1 횃불');actCD=0.3;return;
+    }
+    case 'ground':{
+      if(!it||it.tool!=='shovel')return;
+      swing();actCD=0.4;
+      if(digAt(tg.obj.x,tg.obj.z)){useTool();if(addItem('dirt',1))spawnDropAt('dirt',1,P.x,P.z);toast('+1 흙');}
+      return;
+    }
+    case 'block':{
+      const h=tg.obj,B=BLOCKS[h.b],n=blockHits(h.b);
+      if(!n){toast(needText(B));actCD=0.6;return;}
+      swing();actCD=0.35;const k=vkey(h.x,h.y,h.z);
+      if(mine.key!==k)mine={key:k,hits:0};
+      mine.hits++;useTool();
+      if(mine.hits>=n){mine={key:'',hits:0};breakBlock(h.x,h.y,h.z);}
+      return;
+    }
+    case 'tree':{
+      const t=tg.obj,s=st(t.id),pw=toolPower('axe');
+      if(pw){
+        swing();actCD=0.5;const need=Math.ceil(TREE_HP[t.type]/pw);s.hits=(s.hits||0)+1;useTool();
+        if(s.hits>=need)fellTree(t,tg.c);else toast(`${treeName(t)} 베는 중 ${s.hits}/${need}`);
+      }else if(t.apple){
+        swing();actCD=0.8;const a=s.apples??t.appleMax;
+        if(a<=0){toast('사과가 더 없어요');return;}
+        const k=Math.min(a,1+Math.floor(Math.random()*2));s.apples=a-k;
+        for(let i=0;i<k;i++){const an=Math.random()*6.2832,d=0.8+Math.random()*1.5;spawnDropAt('apple',1,t.x+Math.cos(an)*d,t.z+Math.sin(an)*d);}
+        buildFlora(tg.c);toast(`사과 ${k}개가 떨어졌어요`);
+      }else{toast('도끼가 있어야 나무를 벨 수 있어요');actCD=0.6;}
+      return;
+    }
+    case 'log':{
+      const l=tg.obj,s=st(l.id),pw=toolPower('axe');
+      if(!pw){toast('도끼가 있어야 자를 수 있어요');actCD=0.6;return;}
+      swing();actCD=0.5;const need=Math.ceil(3/pw);s.hits=(s.hits||0)+1;useTool();
+      if(s.hits>=need){
+        s.gone=true;buildFlora(tg.c);
+        const n=2+Math.floor(Math.random()*2);
+        for(let k=0;k<n;k++){const p=l.a.clone().lerp(l.b,(k+0.5)/n);spawnDropAt('log',1,p.x,p.z);}
+        toast('죽은 통나무를 잘랐어요');
+      }else toast(`통나무 자르는 중 ${s.hits}/${need}`);
+      return;
+    }
+  }
+}
+// 우클릭: 화로 열기, 블록·횃불 놓기
+function doUse(){
+  const tg=target,it=heldItem();
+  if(tg&&tg.kind==='block'&&(tg.obj.b===11||tg.obj.b===12)){openFurnace(vkey(tg.obj.x,tg.obj.y,tg.obj.z));return;}
+  if(!it||!(it.place||it.torch))return;
+  let cell=null,tp=null;
+  if(tg&&tg.kind==='block'){
+    const h=tg.obj;cell=[h.x+h.nx,h.y+h.ny,h.z+h.nz];
+    tp=h.ny===1?[h.x+0.5,h.y+1,h.z+0.5,0,0]:h.ny===-1?null:[h.x+0.5+h.nx*0.6,h.y+0.25,h.z+0.5+h.nz*0.6,h.nx,h.nz];
+  }else if(tg&&tg.kind==='ground'){const g=tg.obj;cell=[Math.floor(g.x),Math.floor(g.y+0.5),Math.floor(g.z)];tp=[g.x,g.y,g.z,0,0];}
+  if(!cell){toast('여기에는 놓을 수 없어요');return;}
+  if(it.torch){if(!tp){toast('천장에는 횃불을 붙일 수 없어요');return;}addTorch(...tp);consumeSel();swing();return;}
+  if(placeBlock(it.place,...cell)){consumeSel();swing();}
+  else toast('여기에는 놓을 수 없어요');
+}
+addEventListener('mousedown',e=>{
+  if(!locked)return;
+  if(e.button===0){mouseDown=true;doAction();}
+  else if(e.button===2)doUse();
+});
+addEventListener('mouseup',e=>{if(e.button===0)mouseDown=false;});
+let toastTimer=0;
+function toast(msg){const t=$('toast');t.textContent=msg;t.style.opacity=1;clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.style.opacity=0,1400);}
+
+// ================= 입력 =================
+let locked=false;
+function keyName(code){
+  if(code==='ShiftLeft'||code==='ShiftRight')return 'Shift';
+  if(code==='ControlLeft'||code==='ControlRight')return 'Ctrl';
+  return code;
+}
+let lastSpace=0;
+addEventListener('keydown',e=>{
+  if(chatOpen)return;
+  if(invOpen){
+    if(e.code==='KeyE'||e.code==='Escape')closeInv();
+    else if(e.code==='KeyQ'&&hover)dropFromSlot(hover.arr,hover.i,1);
+    e.preventDefault();return;
+  }
+  if(!locked)return;
+  if(e.code==='Escape'){document.exitPointerLock();return;}
+  if(e.code==='KeyE'){e.preventDefault();openInv();return;}
+  if(e.code==='Slash'){e.preventDefault();openChat();return;}
+  if(!e.repeat){
+    if(e.code==='KeyQ')dropFromSlot(inv,sel,1);
+    if(/^Digit\d$/.test(e.code)){const d=+e.code[5];selectSlot(d===0?9:d-1);}
+    if(e.code==='Space'&&admin){const now=performance.now();
+      if(now-lastSpace<300){flying=!flying;P.vy=0;toast(flying?'날기 켬 (Space 위 · Shift 아래)':'날기 끔');lastSpace=0;}else lastSpace=now;}
+  }
+  keys[keyName(e.code)]=true;e.preventDefault();
+});
+// ================= 채팅과 관리자 명령어 =================
+let chatOpen=false;
+function chatLog(msg){
+  const box=$('chatLog'),d=document.createElement('div');d.textContent=msg;box.appendChild(d);
+  while(box.children.length>7)box.firstChild.remove();
+  setTimeout(()=>d.classList.add('fade'),8000);
+}
+function openChat(){
+  chatOpen=true;mouseDown=false;for(const k in keys)keys[k]=false;
+  const c=$('chatIn');c.style.display='block';c.value='';$('chatLog').classList.add('open');
+  document.exitPointerLock();setTimeout(()=>c.focus(),0);
+}
+function closeChat(){chatOpen=false;const c=$('chatIn');c.style.display='none';c.blur();$('chatLog').classList.remove('open');lockPointer();}
+$('chatIn').addEventListener('keydown',e=>{
+  e.stopPropagation();
+  if(e.key==='Enter'){setTimeout(()=>{runCommand($('chatIn').value);closeChat();},0);}   // 한글 입력이 끝난 뒤에 읽음
+  else if(e.key==='Escape')closeChat();
+});
+function runCommand(raw){
+  const t=raw.trim().replace(/^\//,'').trim();if(!t)return;
+  if(t==='관리자12345'){admin=true;buildAdminGrid();chatLog('관리자 모드가 켜졌어요. Space 두 번: 날기 · E: 모든 아이템 · /도움: 명령어');return;}
+  if(!admin){chatLog('알 수 없는 명령어예요.');return;}
+  if(t==='도움')chatLog('/낮 · /밤 · /끄기 (관리자 모드 끄기)');
+  else if(t==='낮'){gameTime=Math.floor(gameTime)+0.5;chatLog('낮 12시로 바꿨어요.');}
+  else if(t==='밤'){gameTime=Math.floor(gameTime)+0.88;chatLog('밤 9시로 바꿨어요.');}
+  else if(t==='끄기'){admin=false;flying=false;chatLog('관리자 모드를 껐어요.');}
+  else chatLog('알 수 없는 명령어예요. /도움 을 입력해 봐요.');
+}
+function lockPointer(){const r=renderer.domElement.requestPointerLock();if(r&&r.catch)r.catch(()=>{});}
+document.addEventListener('pointerlockerror',()=>{
+  if(invOpen||chatOpen)return;
+  $('overlay').style.display='flex';$('hud').style.display='none';$('startBtn').textContent='계속하기';
+});
+addEventListener('keyup',e=>{keys[keyName(e.code)]=false;if(locked)e.preventDefault();});
+addEventListener('blur',()=>{for(const k in keys)keys[k]=false;});
+addEventListener('mousemove',e=>{
+  if(!locked)return;
+  P.yaw-=e.movementX*0.0022;
+  P.pitch=Math.max(-1.55,Math.min(1.55,P.pitch-e.movementY*0.0022));
+});
+addEventListener('wheel',e=>{
+  if(!locked)return;e.preventDefault();
+  if(Math.abs(e.deltaY)>0)selectSlot((sel+(e.deltaY>0?1:9))%10);
+},{passive:false});
+$('startBtn').addEventListener('click',()=>{
+  const el=document.documentElement;
+  if(!document.fullscreenElement&&el.requestFullscreen){
+    el.requestFullscreen().then(()=>{if(navigator.keyboard&&navigator.keyboard.lock)navigator.keyboard.lock().catch(()=>{});}).catch(()=>{});
+  }
+  lockPointer();
+});
+document.addEventListener('pointerlockchange',()=>{
+  locked=document.pointerLockElement===renderer.domElement;
+  const pause=!locked&&!invOpen&&!chatOpen;
+  $('overlay').style.display=pause?'flex':'none';
+  $('hud').style.display=pause?'none':'block';
+  if(!locked){for(const k in keys)keys[k]=false;}
+  if(pause)$('startBtn').textContent='계속하기';
+});
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+
+// ================= 시작 =================
+function findSpawn(){
+  for(let r=0;r<3000;r+=6)for(let a=0;a<6.283;a+=0.5){
+    const x=Math.cos(a)*r,z=Math.sin(a)*r,h=terrainH(x,z);
+    if(h>WATER_Y+2&&Math.abs(terrainH(x+2,z)-h)+Math.abs(terrainH(x,z+2)-h)<1)return [x,z];
+  }
+  return [0,0];
+}
+let last=performance.now();
+function loop(){
+  requestAnimationFrame(loop);
+  const now=performance.now();let dt=(now-last)/1000;last=now;if(dt>0.05)dt=0.05;
+  fpsN++;fpsT+=dt;if(fpsT>=0.5){fps=Math.round(fpsN/fpsT);fpsN=0;fpsT=0;}
+  const playing=locked||invOpen||chatOpen;
+  if(playing){updatePlayer(dt);gameTime+=dt/DAY_SECONDS*(keys.KeyT?60:1);}
+  windU.value+=dt;
+  updateChunks();
+  updateCamera(dt);
+  updateSky();
+  if(playing){updateFalling(dt);updateFallingBlocks(dt);updateFurnaces(dt);actCD=Math.max(0,actCD-dt);}
+  flushVox();
+  updateLights(now/1000);
+  if(invOpen&&curFurn){if(curFurn.dirty)renderSlots();else renderFurnBars();}
+  updateHand(dt);
+  if(locked){
+    target=findTarget();
+    if(mouseDown)doAction();                     // 누르고 있으면 계속 베기
+    const pr=$('prompt'),txt=target?promptText(target):'';
+    pr.textContent=txt;pr.style.display=txt?'block':'none';
+  }
+  if(playing)updateHUD();
+  renderer.render(scene,camera);
+}
+setTimeout(()=>{
+  const [sx,sz]=findSpawn();P.x=sx;P.z=sz;
+  const pcx=Math.floor(sx/CHUNK),pcz=Math.floor(sz/CHUNK);
+  for(let dz=-2;dz<=2;dz++)for(let dx=-2;dx<=2;dx++)buildChunk(pcx+dx,pcz+dz);
+  collideObjects();P.y=groundH(P.x,P.z);
+  updateChunks();invChanged();
+  const btn=$('startBtn');btn.disabled=false;btn.textContent='시작하기';
+  loop();
+},30);
+</script>
+</body>
+</html>
