@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>급식 · 학사일정</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    min-height: 100vh; font-family: "Malgun Gothic", system-ui, sans-serif;
+    background: linear-gradient(160deg, #134e4a, #0f766e 60%, #2aa198);
+    color: #fff; display: flex; justify-content: center; padding: 24px 16px;
+  }
+  .app { width: 100%; max-width: 460px; }
+  h1 { font-size: 22px; margin-bottom: 16px; text-align: center; }
+  .card { background: rgba(255,255,255,.14); border-radius: 18px; padding: 18px; margin-bottom: 14px; }
+  label { font-size: 13px; opacity: .85; display: block; margin-bottom: 6px; }
+  .row { display: flex; gap: 8px; }
+  input {
+    flex: 1; padding: 11px 12px; border: none; border-radius: 10px;
+    font-size: 15px; min-width: 0;
+  }
+  button {
+    padding: 11px 16px; border: none; border-radius: 10px; cursor: pointer;
+    background: #ffd54a; color: #222; font-weight: bold; font-size: 15px;
+  }
+  button.ghost { background: rgba(255,255,255,.25); color: #fff; font-weight: normal; }
+  .hint { font-size: 12px; opacity: .8; margin-top: 8px; line-height: 1.5; }
+  .hint a { color: #ffe58a; }
+  #msg { text-align: center; min-height: 22px; font-size: 14px; margin-bottom: 8px; }
+  .list button {
+    display: block; width: 100%; text-align: left; margin-top: 6px;
+    background: rgba(255,255,255,.2); color: #fff; font-weight: normal; font-size: 14px;
+  }
+  .list small { opacity: .75; display: block; margin-top: 2px; }
+  .tabs { display: flex; gap: 8px; margin: 10px 0; }
+  .tabs button { flex: 1; }
+  .tabs button.on { background: #ffd54a; color: #222; }
+  .meal { background: rgba(255,255,255,.12); border-radius: 10px; padding: 10px 12px; margin-top: 8px; font-size: 14px; line-height: 1.7; }
+  .meal h3 { font-size: 14px; color: #ffe58a; margin-bottom: 2px; }
+  .ev { display: flex; gap: 10px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,.15); font-size: 14px; }
+  .ev span:first-child { width: 48px; opacity: .8; flex-shrink: 0; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>🍚 급식 · 학사일정</h1>
+
+  <div class="card">
+    <label for="key">NEIS 인증키 (API 키)</label>
+    <div class="row">
+      <input id="key" type="password" placeholder="인증키를 붙여 넣어요" autocomplete="off">
+      <button id="saveKey">저장</button>
+    </div>
+    <p class="hint">
+      키는 이 브라우저(localStorage)에만 저장되고 파일이나 GitHub에는 올라가지 않아요.
+      발급: <a href="https://open.neis.go.kr" target="_blank" rel="noopener">open.neis.go.kr</a>
+      (회원가입 → 인증키 신청)
+    </p>
+  </div>
+
+  <div class="card">
+    <label for="school">학교 이름</label>
+    <div class="row">
+      <input id="school" placeholder="학교 이름을 입력해요">
+      <button id="search">검색</button>
+    </div>
+    <div class="list" id="results"></div>
+    <button class="ghost hidden" id="resetKey" style="margin-top:10px;width:100%">키 지우기</button>
+  </div>
+
+  <div id="msg"></div>
+
+  <div class="card hidden" id="main">
+    <div id="picked" style="font-size:17px;font-weight:bold"></div>
+    <div class="tabs">
+      <button id="tabMeal" class="on">급식</button>
+      <button id="tabCal">학사일정</button>
+    </div>
+    <div class="row">
+      <input type="date" id="date">
+      <button class="ghost" id="go">보기</button>
+    </div>
+    <div id="out"></div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const BASE = "https://open.neis.go.kr/hub";
+const store = {
+  get() { try { return localStorage.getItem("neis_key") || ""; } catch { return ""; } },
+  set(v) { try { localStorage.setItem("neis_key", v); } catch {} },
+  del() { try { localStorage.removeItem("neis_key"); } catch {} }
+};
+let school = null, tab = "meal";
+
+$("key").value = store.get();
+if (store.get()) $("resetKey").classList.remove("hidden");
+
+const pad = n => String(n).padStart(2, "0");
+const today = new Date();
+$("date").value = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+
+function say(t, err) { $("msg").textContent = t; $("msg").style.color = err ? "#ffb4b4" : "#fff"; }
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+// NEIS 응답: { 서비스명: [ {head:[...]}, {row:[...]} ] } 또는 { RESULT: {CODE, MESSAGE} }
+async function call(service, params) {
+  const key = store.get();
+  if (!key) throw new Error("먼저 인증키를 저장해 주세요.");
+  const q = new URLSearchParams({ KEY: key, Type: "json", pIndex: 1, pSize: 100, ...params });
+  const res = await fetch(`${BASE}/${service}?${q}`);
+  const data = await res.json();
+  if (data.RESULT) {
+    const c = data.RESULT.CODE;
+    if (c === "INFO-200") return [];
+    if (c === "ERROR-290") throw new Error("인증키가 올바르지 않아요.");
+    throw new Error(data.RESULT.MESSAGE || "오류가 났어요.");
+  }
+  return data[service][1].row;
+}
+
+function errText(e) { return e.message === "Failed to fetch" ? "네트워크 오류예요. 인터넷을 확인해 주세요." : e.message; }
+
+$("saveKey").onclick = () => {
+  const v = $("key").value.trim();
+  if (!v) return say("키를 입력해 주세요.", true);
+  store.set(v); $("resetKey").classList.remove("hidden"); say("키를 저장했어요.");
+};
+$("resetKey").onclick = () => { store.del(); $("key").value = ""; $("resetKey").classList.add("hidden"); say("키를 지웠어요."); };
+
+$("search").onclick = async () => {
+  const name = $("school").value.trim();
+  if (!name) return say("학교 이름을 입력해 주세요.", true);
+  say("검색 중..."); $("results").innerHTML = "";
+  try {
+    const rows = await call("schoolInfo", { SCHUL_NM: name });
+    if (!rows.length) return say("검색 결과가 없어요.", true);
+    say(`${rows.length}곳을 찾았어요. 하나를 골라 주세요.`);
+    $("results").innerHTML = rows.map((r, i) =>
+      `<button data-i="${i}">${esc(r.SCHUL_NM)}<small>${esc(r.ORG_RDNMA || "")} · ${esc(r.SCHUL_KND_SC_NM)}</small></button>`).join("");
+    $("results").querySelectorAll("button").forEach(b => b.onclick = () => pick(rows[b.dataset.i]));
+  } catch (e) { say(errText(e), true); }
+};
+$("school").addEventListener("keydown", e => { if (e.key === "Enter") $("search").click(); });
+
+function pick(r) {
+  school = { edu: r.ATPT_OFCDC_SC_CODE, code: r.SD_SCHUL_CODE, name: r.SCHUL_NM };
+  $("picked").textContent = school.name;
+  $("results").innerHTML = "";
+  $("main").classList.remove("hidden");
+  say(""); view();
+}
+
+function setTab(t) {
+  tab = t;
+  $("tabMeal").classList.toggle("on", t === "meal");
+  $("tabCal").classList.toggle("on", t === "cal");
+  view();
+}
+$("tabMeal").onclick = () => setTab("meal");
+$("tabCal").onclick = () => setTab("cal");
+$("go").onclick = view;
+
+async function view() {
+  if (!school) return;
+  const d = $("date").value.replaceAll("-", "");
+  if (!d) return say("날짜를 골라 주세요.", true);
+  say("불러오는 중..."); $("out").innerHTML = "";
+  try {
+    const base = { ATPT_OFCDC_SC_CODE: school.edu, SD_SCHUL_CODE: school.code };
+    if (tab === "meal") {
+      const rows = await call("mealServiceDietInfo", { ...base, MLSV_YMD: d });
+      $("out").innerHTML = rows.length ? rows.map(r => {
+        const items = r.DDISH_NM.split(/<br\s*\/?>/i).map(s => s.replace(/\s*\([\d.]+\)/g, "").trim()).filter(Boolean);
+        return `<div class="meal"><h3>${esc(r.MMEAL_SC_NM)} · ${esc(r.CAL_INFO || "")}</h3>${items.map(esc).join("<br>")}</div>`;
+      }).join("") : `<div class="meal">이 날은 급식 정보가 없어요.</div>`;
+    } else {
+      const ym = d.slice(0, 6);
+      const rows = await call("SchoolSchedule", { ...base, AA_FROM_YMD: ym + "01", AA_TO_YMD: ym + "31" });
+      $("out").innerHTML = rows.length ? `<div class="meal">` + rows.map(r =>
+        `<div class="ev"><span>${+r.AA_YMD.slice(4, 6)}/${+r.AA_YMD.slice(6)}</span><span>${esc(r.EVENT_NM)}</span></div>`).join("") + `</div>`
+        : `<div class="meal">이 달은 학사일정이 없어요.</div>`;
+    }
+    say("");
+  } catch (e) { say(errText(e), true); }
+}
+</script>
+</body>
+</html>

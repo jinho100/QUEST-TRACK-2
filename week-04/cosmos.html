@@ -1,0 +1,1671 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>우주 행성 키우기</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#000;color:#fff;
+    font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;user-select:none}
+  canvas{display:block}
+  #hud{position:fixed;left:22px;top:18px;pointer-events:none;text-shadow:0 2px 10px rgba(0,0,0,.7);display:none}
+  #stIdx{font-size:12px;letter-spacing:.15em;opacity:.65}
+  #stName{font-size:32px;font-weight:800;letter-spacing:.02em;margin-top:2px}
+  #stDesc{font-size:13px;opacity:.8;margin-top:3px;max-width:360px}
+  #bar{width:300px;height:7px;background:rgba(255,255,255,.13);border-radius:6px;margin-top:12px;overflow:hidden}
+  #barFill{height:100%;width:0;background:linear-gradient(90deg,#6cf,#c8f,#fc8);border-radius:6px}
+  #mass{font-size:12px;opacity:.75;margin-top:6px}
+  #ladder{position:fixed;right:18px;top:50%;transform:translateY(-50%);font-size:11px;line-height:1.5;
+    text-align:right;pointer-events:none;text-shadow:0 1px 6px #000;display:none}
+  #ladder div{opacity:.25;transition:all .4s}
+  #ladder div.done{opacity:.55}
+  #ladder div.cur{opacity:1;font-weight:800;font-size:14px;color:#ffe7a6}
+  #legend{position:fixed;left:22px;bottom:16px;font-size:12px;opacity:.7;pointer-events:none;display:none;text-shadow:0 1px 6px #000}
+  #legend span{display:inline-block;width:10px;height:10px;border-radius:50%;margin:0 5px -1px 12px}
+  #banner{position:fixed;left:0;right:0;top:24%;text-align:center;pointer-events:none;opacity:0}
+  #banner .s{font-size:14px;letter-spacing:.4em;opacity:.8}
+  #banner .n{font-size:58px;font-weight:900;margin-top:6px;
+    background:linear-gradient(90deg,#9df,#fff,#fcd);-webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 0 18px rgba(180,200,255,.6))}
+  #banner .d{font-size:16px;opacity:.85;margin-top:6px}
+  #banner.show{animation:ban 3.6s ease forwards}
+  @keyframes ban{0%{opacity:0;transform:translateY(16px) scale(.96)}12%{opacity:1;transform:none}75%{opacity:1}100%{opacity:0;transform:translateY(-10px)}}
+  .ov{position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;text-align:center;
+    background:radial-gradient(ellipse at center,rgba(0,0,10,.35),rgba(0,0,10,.75))}
+  .ov.on{display:flex}
+  .ov h1{font-size:64px;margin:0;font-weight:900;letter-spacing:.03em;
+    background:linear-gradient(90deg,#8cf,#e9f,#fd9);-webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 0 24px rgba(160,140,255,.55))}
+  .ov h2{font-size:44px;margin:0;font-weight:900}
+  .ov .sub{opacity:.8;margin-top:8px;font-size:17px}
+  .ov ul{list-style:none;padding:0;margin:26px 0 10px;font-size:14px;line-height:1.9;opacity:.9;text-align:left}
+  .ov li b{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:8px;vertical-align:-1px}
+  .btn{margin:8px;padding:12px 26px;font-size:16px;border-radius:30px;border:1px solid rgba(255,255,255,.4);
+    background:rgba(255,255,255,.08);color:#fff;cursor:pointer;font-family:inherit;backdrop-filter:blur(4px)}
+  .btn:hover{background:rgba(255,255,255,.2)}
+  .row{margin-top:20px}
+  .hint{opacity:.55;font-size:13px;margin-top:14px}
+  .pcard{padding:8px;border-radius:12px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.05);cursor:pointer;color:#fff;font-family:inherit;font-size:14px}
+  .pcard:hover{background:rgba(127,216,255,.2);border-color:#7fd8ff}
+  .pcard canvas{display:block;margin:0 auto 4px}
+  #toast{position:fixed;left:50%;bottom:52px;transform:translateX(-50%);padding:8px 18px;border-radius:20px;background:rgba(10,20,40,.7);
+    border:1px solid rgba(127,216,255,.5);color:#cfefff;font-size:14px;opacity:0;transition:opacity .3s;pointer-events:none}
+  #toast.on{opacity:1}
+  #sats{font-size:12px;margin-top:4px;color:#9fe2ff;opacity:.9}
+  #devBadge{position:fixed;right:18px;top:14px;font-size:12px;color:#ffd27a;display:none;text-shadow:0 1px 6px #000}
+  #dev{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(560px,92vw);padding:18px 20px;border-radius:16px;
+    background:rgba(8,10,24,.92);border:1px solid rgba(255,210,122,.5);display:none;z-index:50}
+  #dev.on{display:block}
+  #dev h3{margin:0 0 4px;color:#ffd27a}
+  #dev .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px;margin-top:12px}
+  #dev button{padding:7px 6px;border-radius:8px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.06);color:#fff;
+    font-family:inherit;font-size:12px;cursor:pointer;text-align:left}
+  #dev button:hover{background:rgba(255,210,122,.2)}
+  #win.on{animation:winIn 2.4s ease both}
+  #win.on h1{animation:winTitle 3s ease both}
+  @keyframes winIn{from{opacity:0}to{opacity:1}}
+  @keyframes winTitle{from{letter-spacing:.6em;opacity:0;filter:blur(8px)}to{letter-spacing:.03em;opacity:1;filter:blur(0)}}
+  #win{background:radial-gradient(ellipse at center,rgba(255,255,255,.0),rgba(255,250,240,.0))}
+  #win h1{background:linear-gradient(90deg,#335,#859,#a63);-webkit-background-clip:text;background-clip:text;filter:none}
+  #win .sub,#win .hint{color:#223}
+  #win .btn{color:#223;border-color:rgba(0,0,40,.35);background:rgba(0,0,40,.06)}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hud">
+  <div id="stIdx"></div>
+  <div id="stName"></div>
+  <div id="stDesc"></div>
+  <div id="bar"><div id="barFill"></div></div>
+  <div id="mass"></div>
+  <div id="sats"></div>
+</div>
+<div id="ladder"></div>
+<div id="legend">
+  <span style="background:#fff;opacity:.6"></span>안전하게 흡수
+  <span style="background:#ffc04a"></span>깨뜨리기 (나도 조금 깨짐)
+  &nbsp;&nbsp;·&nbsp; Space 부스터 &nbsp;·&nbsp; M 소리 &nbsp;·&nbsp; P 일시정지
+</div>
+<div id="toast"></div>
+<div id="devBadge">🛠 관리자 모드</div>
+<div id="dev">
+  <h3>🛠 관리자 모드</h3>
+  <div style="font-size:13px;opacity:.75">이동할 단계를 고르세요. 다시 Shift 를 누르거나 Esc 를 누르면 닫혀요.</div>
+  <div class="grid" id="devGrid"></div>
+</div>
+<div id="banner"><div class="s">새로운 단계</div><div class="n"></div><div class="d"></div></div>
+
+<div class="ov on" id="title">
+  <h1>우주 행성 키우기</h1>
+  <div class="sub">쿼크 하나에서 시작해 세계의 끝까지</div>
+  <ul>
+    <li>⌨️ &nbsp;<b style="background:none;width:auto;margin:0">WASD</b> 로 이동하며 작은 것을 삼켜 성장하세요 · <b style="background:none;width:auto;margin:0">Space</b> 부스터 (1.5배 빠름, 질량을 조금씩 씀)</li>
+    <li><b style="background:#fff;opacity:.7"></b>내 질량의 1/5 이하 — 데미지 없이 흡수</li>
+    <li><b style="background:#ffc04a"></b>1/5 ~ 나와 같은 크기 — 부딪히면 상대가 조각나고, 나도 조금 조각남</li>
+    <li>💎 &nbsp;조각은 다시 먹을 수 있어요 — 잃은 질량의 대부분을 되찾을 수 있음</li>
+    <li>👾 &nbsp;다른 물질도 서로 잡아먹어요. 나보다 크면 쫓아오고, 작으면 도망가요</li>
+    <li>🛰️ &nbsp;행성부터: 나의 1/5 이하 천체를 <b style="background:none;width:auto;margin:0">클릭</b>하면 내 위성이 돼요 (꾹 누르면 위성 없애기)</li>
+    <li><b style="background:#ff4a5a"></b>나보다 큰 것 — 닿으면 큰 데미지, 훨씬 크면 즉사</li>
+    <li>🕳️ &nbsp;블랙홀부터는 깨뜨리지 않고 한 번에 삼켜요 (나도 조각나지 않고 통째로 먹힘)</li>
+    <li>🌌 &nbsp;소행성 단계부터는 우주로 나갑니다</li>
+  </ul>
+  <div class="row"><button class="btn" id="startBtn">시작하기</button></div>
+  <div class="hint">Enter 또는 Space 로 시작</div>
+  <div class="hint" style="font-size:11px;opacity:.4;margin-top:22px">우주 배경 사진: ESO/S. Brunier (은하수 파노라마) · NASA, ESA, S. Beckwith (STScI), HUDF Team (허블 울트라 딥 필드) · CC BY 4.0</div>
+</div>
+
+<div class="ov" id="pick">
+  <h2>어떤 행성이 될까요?</h2>
+  <div class="sub">고른 행성의 모습으로 자라요 (숫자 1~8 키로도 고를 수 있어요)</div>
+  <div id="pickGrid" style="display:grid;grid-template-columns:repeat(4,120px);gap:12px;margin-top:22px"></div>
+</div>
+<div class="ov" id="pause">
+  <h2>일시정지</h2>
+  <div class="hint">P 또는 Esc 로 계속</div>
+</div>
+
+<div class="ov" id="dead">
+  <h2 style="color:#ff8a8a">흡수당했다</h2>
+  <div class="sub" id="deadWhy"></div>
+  <div class="row">
+    <button class="btn" id="retryBtn">이 단계부터 다시 (R)</button>
+    <button class="btn" id="resetBtn">처음부터 (Enter)</button>
+  </div>
+</div>
+
+<div class="ov" id="win">
+  <h1>세계의 끝</h1>
+  <div class="sub">더 이상 삼킬 것이 없다. 모든 것이 하나가 되었다.</div>
+  <div class="sub" id="winStats"></div>
+  <div class="row"><button class="btn" id="againBtn">처음부터 다시 (Enter)</button></div>
+</div>
+
+<script>
+'use strict';
+const TAU = Math.PI * 2;
+const BASE = 5, LOGB = Math.log(BASE), WIN_STAGE = 27, BH_STAGE = 19;
+
+/* ───────────────────────── 단계 정의 ───────────────────────── */
+const STAGES = [
+  { n:'쿼크',             d:'물질의 가장 작은 조각. 같은 쿼크를 모아 보자.',          c:'#ff7aa8', spin:1 },
+  { n:'중성자',           d:'쿼크 셋이 글루온으로 단단히 묶였다.',                  c:'#ffc08a', spin:1 },
+  { n:'수소',             d:'전자를 붙잡아 첫 번째 원자가 되었다.',                  c:'#8ac4ff', spin:1 },
+  { n:'H₂O',              d:'산소와 손잡고 물 분자가 되었다.',                       c:'#7ae6ff', spin:1 },
+  { n:'바이러스',         d:'스스로 복제하는 단백질 껍질.',                          c:'#d08aff', spin:1 },
+  { n:'세균',             d:'살아 숨 쉬는 단세포 생명.',                             c:'#8affb0', spin:1 },
+  { n:'곰팡이',           d:'균사를 뻗어 무엇이든 분해한다.',                        c:'#e0fff0', spin:1 },
+  { n:'모래',             d:'작지만 단단한 광물 알갱이.',                            c:'#ffd99a', spin:0 },
+  { n:'조약돌',           d:'물에 깎여 매끈해졌다.',                                 c:'#c8d0dc', spin:0 },
+  { n:'큰돌',             d:'제법 묵직한 돌덩이.',                                   c:'#b0a8a0', spin:0 },
+  { n:'바위',             d:'이끼 낀 거대한 바위. 이제 땅이 좁다.',                  c:'#a8c890', spin:0 },
+  { n:'소행성',           d:'대기를 벗어나 우주로! 별 사이를 떠도는 돌덩이.',        c:'#c8b49a', spin:0 },
+  { n:'외행성',           d:'스스로 둥글어질 만큼 무거워졌다.',                      c:'#d8e4ff', spin:0 },
+  { n:'행성',             d:'대기와 바다를 가진 행성.',                              c:'#7ac0ff', spin:0 },
+  { n:'갈색외성',         d:'별이 되다 만, 희미하게 빛나는 천체.',                   c:'#ff7a9a', spin:0 },
+  { n:'적색외성',         d:'핵융합에 불이 붙었다. 작고 붉은 별.',                   c:'#ff6a3a', spin:1 },
+  { n:'적색거성',         d:'부풀어 오른 거대한 붉은 별.',                           c:'#ffa04a', spin:1 },
+  { n:'초거성',           d:'태양 수십만 배의 빛을 뿜어낸다.',                       c:'#9ac8ff', spin:1 },
+  { n:'중성자별',         d:'붕괴한 별의 심장. 빛줄기를 뿜으며 회전한다.',           c:'#8af4ff', spin:1 },
+  { n:'블랙홀',           d:'빛조차 빠져나갈 수 없다.',                              c:'#ffb05a', spin:.3 },
+  { n:'초대질량 블랙홀',  d:'태양 수백만 배의 질량을 삼켰다.',                       c:'#b88aff', spin:.3 },
+  { n:'은하 중심 블랙홀', d:'은하 전체를 붙잡아 두는 심장.',                         c:'#8ab8ff', spin:.3 },
+  { n:'은하',             d:'수천억 개의 별이 소용돌이친다.',                        c:'#ffe6b0', spin:.4 },
+  { n:'은하단',           d:'수천 개의 은하가 모인 무리.',                           c:'#d0a8ff', spin:.3 },
+  { n:'초은하단',         d:'우주 거대 구조의 실타래.',                              c:'#ffd88a', spin:.2 },
+  { n:'관측 가능한 우주', d:'빛이 닿을 수 있는 모든 곳.',                            c:'#ffb88a', spin:.2 },
+  { n:'우주 (거품우주)',  d:'수많은 거품 우주 가운데 하나.',                         c:'#e0c8ff', spin:.2 },
+  { n:'세계의 끝',        d:'더 이상 삼킬 것이 없다.',                               c:'#ffffff', spin:0 },
+];
+// 단계별 실제 무게 (kg, 대략값)
+const MASS_KG = [3.9e-30, 1.67e-27, 3.35e-27, 2.99e-26, 1e-18, 1e-15, 1e-12, 1e-6, 2e-2, 20, 1e4, 1e15, 1.3e22, 5.97e24, 6e28, 4e29, 2e30, 1.6e31, 3e31, 6e31, 8e36, 1.3e40, 3e42, 2e45, 2e47, 1.5e53, 1e55, 1e57];
+function realMass(m) {
+  if (m < 1) return MASS_KG[0] * m;
+  const s = stageOf(m); if (s >= WIN_STAGE) return MASS_KG[WIN_STAGE];
+  const frac = Math.min(1, Math.log(m) / LOGB - s);
+  return MASS_KG[s] * Math.pow(MASS_KG[s + 1] / MASS_KG[s], frac);
+}
+function fmtKg(kg) {
+  if (kg >= 1e4 || kg < 1e-3) { const e = Math.floor(Math.log10(kg)); return (kg / 10 ** e).toFixed(2) + '×10' + String(e).replace(/./g, ch => SUP[ch]) + ' kg'; }
+  return kg < 1 ? (kg * 1000).toFixed(1) + ' g' : kg.toFixed(1) + ' kg';
+}
+const radOf = m => Math.pow(m, .4); // 화면 속 반지름
+const stageOf = m => m < 1 ? 0 : Math.min(WIN_STAGE, Math.floor(Math.log(m) / LOGB + 1e-9));
+const stageStart = i => Math.pow(BASE, i);
+
+/* ───────────────────────── 도우미 ───────────────────────── */
+function mk(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+function rng(seed) { return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function hexA(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; }
+const lerp = (a, b, t) => a + (b - a) * t;
+const pick = (q, arr) => arr[(q() * arr.length) | 0];
+function glow(c, x, y, r, col, a) {
+  const g = c.createRadialGradient(x, y, 0, x, y, r);
+  g.addColorStop(0, hexA(col, a)); g.addColorStop(.35, hexA(col, a * .35)); g.addColorStop(1, hexA(col, 0));
+  c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill();
+}
+function sphere(c, x, y, r, light, base, dark) {
+  const g = c.createRadialGradient(x - r * .35, y - r * .4, r * .05, x, y, r);
+  g.addColorStop(0, light); g.addColorStop(.5, base); g.addColorStop(1, dark);
+  c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill();
+}
+function irr(q, n, lo, hi) {
+  const p = [];
+  for (let i = 0; i < n; i++) { const a = i / n * TAU + (q() - .5) * .45, r = lo + (hi - lo) * q(); p.push([Math.cos(a) * r, Math.sin(a) * r]); }
+  return p;
+}
+function smoothPath(c, p) {
+  const n = p.length, mid = i => [(p[i % n][0] + p[(i + 1) % n][0]) / 2, (p[i % n][1] + p[(i + 1) % n][1]) / 2];
+  c.beginPath(); const s = mid(n - 1); c.moveTo(s[0], s[1]);
+  for (let i = 0; i < n; i++) { const m = mid(i); c.quadraticCurveTo(p[i][0], p[i][1], m[0], m[1]); }
+  c.closePath();
+}
+function polyPath(c, p) { c.beginPath(); c.moveTo(p[0][0], p[0][1]); for (const v of p) c.lineTo(v[0], v[1]); c.closePath(); }
+function circle(c, x, y, r) { c.beginPath(); c.arc(x, y, r, 0, TAU); }
+function terminator(c, r, a) {
+  const g = c.createLinearGradient(-r * .7, -r * .7, r, r);
+  g.addColorStop(0, 'rgba(0,0,10,0)'); g.addColorStop(.5, `rgba(0,0,10,${a * .25})`); g.addColorStop(1, `rgba(0,0,10,${a})`);
+  c.fillStyle = g; circle(c, 0, 0, r); c.fill();
+}
+function speckle(c, q, n, R, cols, a, s) {
+  for (let i = 0; i < n; i++) { const an = q() * TAU, d = Math.sqrt(q()) * R; c.fillStyle = hexA(pick(q, cols), a * (.4 + q() * .6)); circle(c, Math.cos(an) * d, Math.sin(an) * d, s * (.4 + q())); c.fill(); }
+}
+
+/* ───────────────────────── 물체 그림 (스프라이트) ───────────────────────── */
+const SPR = 256, SR = 80; // 스프라이트 크기, 몸체 반지름
+const DRAW = [];
+DRAW[0] = (c, R, q, v) => { // 쿼크
+  const col = ['#ff4d78', '#4dff9a', '#5aa8ff'][v];
+  glow(c, 0, 0, R * 1.55, col, .6);
+  const g = c.createRadialGradient(0, 0, 0, 0, 0, R * .8);
+  g.addColorStop(0, '#fff'); g.addColorStop(.3, hexA(col, 1)); g.addColorStop(.7, hexA(col, .5)); g.addColorStop(1, hexA(col, 0));
+  c.fillStyle = g; circle(c, 0, 0, R * .8); c.fill();
+  c.globalCompositeOperation = 'lighter';
+  for (let k = 0; k < 2; k++) {
+    c.save(); c.rotate(k * Math.PI / 2 + .4);
+    const lg = c.createLinearGradient(-R * 1.4, 0, R * 1.4, 0);
+    lg.addColorStop(0, 'rgba(255,255,255,0)'); lg.addColorStop(.5, 'rgba(255,255,255,.75)'); lg.addColorStop(1, 'rgba(255,255,255,0)');
+    c.fillStyle = lg; c.fillRect(-R * 1.4, -1.5, R * 2.8, 3); c.restore();
+  }
+  for (let i = 0; i < 6; i++) { const a = q() * TAU, d = R * (.7 + q() * .4); glow(c, Math.cos(a) * d, Math.sin(a) * d, 7, '#ffffff', .8); }
+};
+DRAW[1] = (c, R, q) => { // 중성자
+  glow(c, 0, 0, R * 1.55, '#ffb070', .45);
+  c.fillStyle = 'rgba(255,210,170,.12)'; circle(c, 0, 0, R * .95); c.fill();
+  c.strokeStyle = 'rgba(255,225,190,.35)'; c.lineWidth = 2; c.stroke();
+  const a0 = q() * TAU, pts = [0, 1, 2].map(k => [Math.cos(a0 + k * TAU / 3) * R * .43, Math.sin(a0 + k * TAU / 3) * R * .43]);
+  c.strokeStyle = 'rgba(255,255,255,.7)'; c.lineWidth = 2.5;
+  for (let k = 0; k < 3; k++) {
+    const A = pts[k], B = pts[(k + 1) % 3], dx = B[0] - A[0], dy = B[1] - A[1], L = Math.hypot(dx, dy), nx = -dy / L, ny = dx / L;
+    c.beginPath();
+    for (let i = 0; i <= 40; i++) { const t = i / 40, w = Math.sin(t * TAU * 4) * 6; const x = A[0] + dx * t + nx * w, y = A[1] + dy * t + ny * w; i ? c.lineTo(x, y) : c.moveTo(x, y); }
+    c.stroke();
+  }
+  const cols = [['#ffd0d8', '#ff3d63', '#7a0a20'], ['#d0ffe0', '#2fd66b', '#0a5a28'], ['#d0e4ff', '#3d84ff', '#0a2a7a']];
+  pts.forEach((p, k) => { glow(c, p[0], p[1], R * .55, cols[k][1], .5); sphere(c, p[0], p[1], R * .32, ...cols[k]); });
+};
+DRAW[2] = (c, R, q) => { // 수소
+  glow(c, 0, 0, R * 1.5, '#6aa8ff', .35);
+  const g = c.createRadialGradient(0, 0, 0, 0, 0, R);
+  g.addColorStop(0, 'rgba(140,190,255,.45)'); g.addColorStop(.6, 'rgba(90,140,255,.15)'); g.addColorStop(1, 'rgba(90,140,255,0)');
+  c.fillStyle = g; circle(c, 0, 0, R); c.fill();
+  c.strokeStyle = 'rgba(180,215,255,.55)'; c.lineWidth = 2;
+  const base = q() * TAU;
+  for (let k = 0; k < 3; k++) { c.beginPath(); c.ellipse(0, 0, R * .92, R * .32, base + k * TAU / 6, 0, TAU); c.stroke(); }
+  glow(c, 0, 0, R * .5, '#ff6b6b', .6);
+  sphere(c, 0, 0, R * .24, '#ffe0e0', '#ff4a4a', '#7a1010');
+  const ea = q() * TAU, ex = Math.cos(ea) * R * .92, ey = Math.sin(ea) * R * .32, ca = Math.cos(base), sa = Math.sin(base);
+  const x = ex * ca - ey * sa, y = ex * sa + ey * ca;
+  glow(c, x, y, R * .3, '#7af0ff', .9); sphere(c, x, y, R * .08, '#fff', '#9af', '#46c');
+};
+DRAW[3] = (c, R) => { // H2O
+  glow(c, 0, 0, R * 1.5, '#4dd0ff', .3);
+  const O = [0, -R * .18], s = Math.sin(52.25 * Math.PI / 180), co = Math.cos(52.25 * Math.PI / 180);
+  const Hs = [[O[0] - s * R * .68, O[1] + co * R * .68], [O[0] + s * R * .68, O[1] + co * R * .68]];
+  c.strokeStyle = 'rgba(230,245,255,.55)'; c.lineWidth = R * .14; c.lineCap = 'round';
+  for (const h of Hs) { c.beginPath(); c.moveTo(O[0], O[1]); c.lineTo(h[0], h[1]); c.stroke(); }
+  for (const h of Hs) sphere(c, h[0], h[1], R * .3, '#ffffff', '#dce8f6', '#7a8aa8');
+  sphere(c, O[0], O[1], R * .5, '#ffc8c0', '#ff3b3b', '#6a0808');
+  c.fillStyle = 'rgba(255,255,255,.55)'; c.beginPath(); c.ellipse(O[0] - R * .18, O[1] - R * .22, R * .12, R * .07, -.6, 0, TAU); c.fill();
+};
+DRAW[4] = (c, R, q) => { // 바이러스
+  glow(c, 0, 0, R * 1.45, '#c06bff', .32);
+  const n = 16, off = q() * TAU;
+  for (let i = 0; i < n; i++) {
+    const a = off + i / n * TAU, x1 = Math.cos(a) * R * .5, y1 = Math.sin(a) * R * .5, x2 = Math.cos(a) * R * .9, y2 = Math.sin(a) * R * .9;
+    c.strokeStyle = '#e2a8ff'; c.lineWidth = 4; c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke();
+    sphere(c, x2, y2, R * .085, '#ffe0f4', '#ff7ad0', '#8a1a6a');
+  }
+  sphere(c, 0, 0, R * .6, '#f0c8ff', '#9a46e0', '#2e0a5a');
+  c.save(); circle(c, 0, 0, R * .6); c.clip();
+  for (let i = 0; i < 26; i++) { const a = q() * TAU, d = Math.sqrt(q()) * R * .55; c.strokeStyle = 'rgba(255,220,255,.22)'; c.lineWidth = 1.5; c.beginPath(); for (let k = 0; k <= 6; k++) { const aa = k / 6 * TAU; const x = Math.cos(a) * d + Math.cos(aa) * 5, y = Math.sin(a) * d + Math.sin(aa) * 5; k ? c.lineTo(x, y) : c.moveTo(x, y); } c.stroke(); }
+  c.restore();
+};
+DRAW[5] = (c, R, q) => { // 세균
+  glow(c, 0, 0, R * 1.4, '#6bff9a', .22);
+  c.rotate(q() * TAU);
+  c.strokeStyle = 'rgba(190,255,210,.6)'; c.lineWidth = 2;
+  for (let k = -1; k <= 1; k++) {
+    c.beginPath();
+    for (let i = 0; i <= 30; i++) { const t = i / 30, x = -R * .6 - t * R * .55, y = k * R * .14 + Math.sin(t * TAU * 1.6 + k) * R * .1 * t; i ? c.lineTo(x, y) : c.moveTo(x, y); }
+    c.stroke();
+  }
+  const hw = R * .64, hh = R * .32;
+  c.beginPath(); c.moveTo(-hw + hh, -hh); c.lineTo(hw - hh, -hh); c.arc(hw - hh, 0, hh, -Math.PI / 2, Math.PI / 2); c.lineTo(-hw + hh, hh); c.arc(-hw + hh, 0, hh, Math.PI / 2, Math.PI * 1.5); c.closePath();
+  const g = c.createLinearGradient(0, -hh, 0, hh); g.addColorStop(0, '#b4ffcc'); g.addColorStop(.45, '#3fd27a'); g.addColorStop(1, '#0e6a34');
+  c.fillStyle = g; c.fill(); c.strokeStyle = 'rgba(230,255,240,.7)'; c.lineWidth = 2.5; c.stroke();
+  c.save(); c.clip();
+  for (let i = 0; i < 12; i++) { c.fillStyle = `rgba(10,70,40,${.25 + q() * .3})`; circle(c, (q() - .5) * hw * 1.6, (q() - .5) * hh * 1.2, 2 + q() * 5); c.fill(); }
+  c.restore();
+  c.fillStyle = 'rgba(255,255,255,.45)'; c.beginPath(); c.ellipse(0, -hh * .55, hw * .55, hh * .14, 0, 0, TAU); c.fill();
+};
+DRAW[6] = (c, R, q) => { // 곰팡이
+  glow(c, 0, 0, R * 1.4, '#d8fff0', .2);
+  const tips = [];
+  const br = (x, y, a, len, d) => {
+    const x2 = x + Math.cos(a) * len, y2 = y + Math.sin(a) * len;
+    c.strokeStyle = `rgba(230,255,240,${.35 + d * .12})`; c.lineWidth = d * .9 + .6;
+    c.beginPath(); c.moveTo(x, y); c.quadraticCurveTo((x + x2) / 2 + (q() - .5) * len * .4, (y + y2) / 2 + (q() - .5) * len * .4, x2, y2); c.stroke();
+    if (d > 0) { br(x2, y2, a - .3 - q() * .5, len * .72, d - 1); br(x2, y2, a + .3 + q() * .5, len * .72, d - 1); } else tips.push([x2, y2]);
+  };
+  const n = 7; for (let i = 0; i < n; i++) br(0, 0, i / n * TAU + q() * .5, R * .3, 3);
+  for (const t of tips) { glow(c, t[0], t[1], 8, '#bfffe0', .5); sphere(c, t[0], t[1], 3.2 + q() * 2.5, '#ffffff', '#9fe8c8', '#3a7a62'); }
+  for (let i = 0; i < 90; i++) { const a = q() * TAU, d = R * .3 * Math.sqrt(q()); c.strokeStyle = 'rgba(255,255,255,.25)'; c.lineWidth = 1; c.beginPath(); c.moveTo(Math.cos(a) * d, Math.sin(a) * d); c.lineTo(Math.cos(a) * (d + 8), Math.sin(a) * (d + 8)); c.stroke(); }
+  sphere(c, 0, 0, R * .3, '#ffffff', '#c8e6d4', '#5a7a6a');
+};
+/* ── 현실적인 그림: 노이즈 + 픽셀 단위 빛 계산 ── */
+const PERM = new Uint8Array(512), RV = new Float32Array(256);
+(() => { const q = rng(4242), p = [...Array(256).keys()]; for (let i = 255; i > 0; i--) { const j = (q() * (i + 1)) | 0; [p[i], p[j]] = [p[j], p[i]]; } for (let i = 0; i < 512; i++) PERM[i] = p[i & 255]; for (let i = 0; i < 256; i++) RV[i] = q(); })();
+function vnoise(x, y, z) {
+  const X = Math.floor(x), Y = Math.floor(y), Z = Math.floor(z), fx = x - X, fy = y - Y, fz = z - Z;
+  const u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy), w = fz * fz * (3 - 2 * fz);
+  const h = (i, j, k) => RV[PERM[PERM[PERM[(X + i) & 255] + ((Y + j) & 255)] + ((Z + k) & 255)]];
+  return lerp(lerp(lerp(h(0, 0, 0), h(1, 0, 0), u), lerp(h(0, 1, 0), h(1, 1, 0), u), v), lerp(lerp(h(0, 0, 1), h(1, 0, 1), u), lerp(h(0, 1, 1), h(1, 1, 1), u), v), w);
+}
+function fbm(x, y, z, oct) { let a = .5, f = 1, s = 0, n = 0; for (let i = 0; i < oct; i++) { s += a * vnoise(x * f, y * f, z * f); n += a; a *= .5; f *= 2.03; } return s / n; }
+const LX = -.55, LY = -.5, LZ = .67, HX = LX, HY = LY, HZ = LZ + 1, HL = Math.hypot(HX, HY, HZ);
+function hex3(h) { const n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+function mix3(a, b, t) { t = t < 0 ? 0 : t > 1 ? 1 : t; return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]; }
+function ramp(cols, t) { t = Math.max(0, Math.min(.9999, t)) * (cols.length - 1); const i = Math.floor(t); return mix3(cols[i], cols[i + 1], t - i); }
+const sstep = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+const PUT = (c, cv) => c.drawImage(cv, -SPR / 2, -SPR / 2);
+
+// 공 모양 천체: tex(x, y, z, off) 가 표면 색을 돌려줌. 빛은 왼쪽 위에서
+function renderSphere(R, seed, tex, opt) {
+  opt = opt || {};
+  const cv = mk(SPR, SPR), c = cv.getContext('2d'), img = c.createImageData(SPR, SPR), D = img.data, C = SPR / 2;
+  const q = rng(seed), off = [q() * 50, q() * 50, q() * 50], amb = opt.amb == null ? .04 : opt.amb;
+  for (let y = 0; y < SPR; y++) for (let x = 0; x < SPR; x++) {
+    const dx = (x + .5 - C) / R, dy = (y + .5 - C) / R, d = Math.hypot(dx, dy);
+    const edge = Math.min(1, (1 - d) * R + .5); if (edge <= 0) continue;
+    const nz = Math.sqrt(Math.max(0, 1 - d * d)), col = tex(dx, dy, nz, off);
+    let r = col[0], g = col[1], b = col[2];
+    if (opt.emissive) {
+      const k = 1 - opt.limb * (1 - Math.pow(nz, .5));
+      r *= k; g *= Math.pow(k, 1.4); b *= Math.pow(k, 2);
+    } else {
+      const lam = Math.max(0, dx * LX + dy * LY + nz * LZ), sh = amb + (1 - amb) * lam;
+      r *= sh; g *= sh; b *= sh;
+      if (col[3]) { const sp = Math.pow(Math.max(0, (dx * HX + dy * HY + nz * HZ) / HL), 30) * col[3] * 255; r += sp; g += sp; b += sp; }
+      if (opt.atmo) { const rim = Math.pow(1 - nz, 2.2) * Math.max(0, .15 + dx * LX + dy * LY + .3) * opt.atmoA; r += opt.atmo[0] * rim; g += opt.atmo[1] * rim; b += opt.atmo[2] * rim; }
+    }
+    const i = (y * SPR + x) * 4; D[i] = r; D[i + 1] = g; D[i + 2] = b; D[i + 3] = edge * 255;
+  }
+  c.putImageData(img, 0, 0); return cv;
+}
+// 울퉁불퉁한 돌: 높이 지도로 그림자 계산
+function renderRock(R, seed, o) {
+  const cv = mk(SPR, SPR), c = cv.getContext('2d'), img = c.createImageData(SPR, SPR), D = img.data, C = SPR / 2;
+  const q = rng(seed), ox = q() * 50, oy = q() * 50, ang = q() * TAU, ca = Math.cos(ang), sa = Math.sin(ang), sq = o.squash || 1;
+  const RT = new Float32Array(361);
+  for (let i = 0; i <= 360; i++) { const th = i / 360 * TAU; RT[i] = 1 + o.amp * (fbm(Math.cos(th) * 1.4 + ox, Math.sin(th) * 1.4 + oy, 7.7, 3) - .5) * 2.6; }
+  let mx = 0; for (const v of RT) mx = Math.max(mx, v); for (let i = 0; i <= 360; i++) RT[i] /= mx;
+  const rad = (px, py) => RT[Math.round(((Math.atan2(py, px) + TAU) % TAU) / TAU * 360)];
+  const cr = []; for (let i = 0; i < (o.craters || 0); i++) cr.push([(q() - .5) * 1.2, (q() - .5) * 1.2, .07 + q() * .2]);
+  const cols = o.cols.map(hex3), amb = o.amb == null ? .14 : o.amb, hgt = o.height || 1;
+  const H = (px, py) => {
+    const t = Math.hypot(px, py) / rad(px, py); if (t >= 1) return -1;
+    let h = Math.sqrt(1 - t * t) * hgt + o.bump * (fbm(px * o.bs + ox, py * o.bs + oy, 1.3, 4) - .5);
+    for (const k of cr) { const dd = Math.hypot(px - k[0], py - k[1]) / k[2]; if (dd < 1) h -= (1 - dd * dd) * k[2] * .55; else if (dd < 1.3) h += (1.3 - dd) * k[2] * .5; }
+    return h;
+  };
+  const e = 1.2 / R;
+  for (let y = 0; y < SPR; y++) for (let x = 0; x < SPR; x++) {
+    const X0 = (x + .5 - C) / R, Y0 = (y + .5 - C) / R;
+    const px = X0 * ca + Y0 * sa, py = (-X0 * sa + Y0 * ca) / sq;
+    const rr = rad(px, py), t = Math.hypot(px, py) / rr; if (t >= 1) continue;
+    const edge = Math.min(1, (1 - t) * rr * R * sq * .9 + .5);
+    const h = H(px, py);
+    let a1 = H(px + e, py), a2 = H(px - e, py), b1 = H(px, py + e), b2 = H(px, py - e);
+    if (a1 < 0) a1 = h; if (a2 < 0) a2 = h; if (b1 < 0) b1 = h; if (b2 < 0) b2 = h;
+    const nx = -(a1 - a2) / (2 * e), ny = -(b1 - b2) / (2 * e);
+    const snx = nx * ca - ny * sa, sny = nx * sa + ny * ca, L = Math.hypot(snx, sny, 1);
+    const lam = Math.max(0, (snx * LX + sny * LY + LZ) / L);
+    let col = ramp(cols, sstep(.3, .7, fbm(px * 2.2 + ox, py * 2.2 + oy, 3.3, 4)));
+    const sp = vnoise(px * 38 + ox, py * 38 + oy, 9.1), sk = o.speck == null ? .6 : o.speck;
+    if (sp > .78) col = mix3(col, [255, 255, 255], (sp - .78) * 1.6 * sk); else if (sp < .2) col = mix3(col, [0, 0, 0], (.2 - sp) * 2 * sk);
+    if (o.moss) { const mv = fbm(px * 3 + 11, py * 3 + 5, 2.2, 4); if (mv > .5 && -sny / L > -.15) col = mix3(col, [70, 100, 44], sstep(.5, .62, mv) * .85); }
+    for (const k of cr) { const dd = Math.hypot(px - k[0], py - k[1]) / k[2]; if (dd < 1) col = mix3(col, [0, 0, 0], .15 * (1 - dd)); }
+    const shd = amb + (1 - amb) * lam;
+    let r = col[0] * shd, g = col[1] * shd, b = col[2] * shd;
+    if (o.spec) { const s2 = Math.pow(Math.max(0, (snx * HX + sny * HY + HZ) / (L * HL)), 24) * o.spec * 255; r += s2; g += s2; b += s2; }
+    const i = (y * SPR + x) * 4; D[i] = r; D[i + 1] = g; D[i + 2] = b; D[i + 3] = edge * 255;
+  }
+  c.putImageData(img, 0, 0); return cv;
+}
+
+DRAW[7] = (c, R, q, v) => PUT(c, renderRock(R, 700 + v, { amp: .28, squash: .85, height: .9, bump: .3, bs: 3, cols: ['#6e5432', '#c9a66a', '#f0dcb0'], speck: .9, spec: .25, amb: .25 }));
+DRAW[8] = (c, R, q, v) => PUT(c, renderRock(R, 800 + v, { amp: .06, squash: .72, height: 1, bump: .04, bs: 2, cols: [['#3e434b', '#7f858e', '#c3c8cf'], ['#4a3f35', '#8f7f6c', '#d2c4b0'], ['#38443e', '#76887c', '#b8c6bc']][v], speck: .5, spec: .45, amb: .22 }));
+DRAW[9] = (c, R, q, v) => PUT(c, renderRock(R, 900 + v, { amp: .2, squash: .85, height: .85, bump: .35, bs: 4, cols: ['#2e2b28', '#6f6a64', '#aaa39a'], speck: .7, amb: .2 }));
+DRAW[10] = (c, R, q, v) => PUT(c, renderRock(R, 1000 + v, { amp: .18, squash: .9, height: .8, bump: .45, bs: 5, cols: ['#25211d', '#5f574e', '#9a8f82'], moss: true, speck: .6, amb: .2 }));
+DRAW[11] = (c, R, q, v) => PUT(c, renderRock(R, 1100 + v, { amp: .32, squash: .78, height: .75, bump: .3, bs: 4, cols: ['#1e1b18', '#4f4740', '#8a7f72'], craters: 10, speck: .5, amb: .03 }));
+DRAW[12] = (c, R, q, v) => { // 외행성
+  const pal = [['#5a4636', '#b39a80', '#efe4d4'], ['#3c3a38', '#77736c', '#b0aba2'], ['#8a7660', '#cdbfa8', '#f4efe6']][v].map(hex3);
+  const crs = Array.from({ length: 14 }, () => { const z = q() * 1.2 - .2, a = q() * TAU, sn = Math.sqrt(Math.max(0, 1 - z * z)); return [Math.cos(a) * sn, Math.sin(a) * sn, z, .05 + q() * .14]; });
+  PUT(c, renderSphere(R, 1200 + v, (x, y, z, o) => {
+    let col = ramp(pal, sstep(.32, .68, fbm(x * 2.2 + o[0], y * 2.2 + o[1], z * 2.2 + o[2], 5)));
+    if (v === 2) { const l = Math.abs(fbm(x * 3 + o[1], y * 3, z * 3 + o[0], 4) - .5); if (l < .018) col = mix3(col, [120, 70, 40], 1 - l / .018); }
+    for (const k of crs) { const dd = Math.acos(Math.min(1, x * k[0] + y * k[1] + z * k[2])) / k[3]; if (dd < 1) col = mix3(col, [0, 0, 0], .25 * (1 - dd * dd)); else if (dd < 1.25) col = mix3(col, [255, 255, 255], (1.25 - dd) * .7); }
+    return col;
+  }, { amb: .03 }));
+};
+DRAW[13] = (c, R, q, v) => { // 행성
+  if (v === 0) { // 지구형
+    glow(c, 0, 0, R * 1.2, '#5a9aff', .35);
+    PUT(c, renderSphere(R, 1300, (x, y, z, o) => {
+      const e = fbm(x * 1.6 + o[0], y * 1.6 + o[1], z * 1.6 + o[2], 6), lat = Math.abs(y);
+      let col, spec = 0;
+      if (e > .53) { const dry = fbm(x * 3 + o[2], y * 3 + o[0], z * 3, 4); col = mix3(hex3('#3d6a2c'), hex3('#a8905e'), sstep(.45, .62, dry) * (1 - lat)); col = mix3(col, hex3('#6e5a3e'), sstep(.6, .7, e)); }
+      else { col = mix3(hex3('#06204a'), hex3('#1a4f86'), sstep(.3, .53, e)); spec = .55; }
+      if (lat > .8 + (e - .5) * .4) { col = [235, 240, 245]; spec = .1; }
+      const ca = sstep(.5, .68, fbm(x * 2.6 + o[1] + 5, y * 5.2 + o[2], z * 2.6 + o[0], 6));
+      col = mix3(col, [250, 252, 255], ca * .95);
+      return [col[0], col[1], col[2], spec * (1 - ca)];
+    }, { amb: .02, atmo: [90, 150, 255], atmoA: .9 }));
+  } else if (v === 1) { // 가스 행성
+    const pal = ['#f2e8d6', '#d8b48a', '#a8704a', '#ecdcc0', '#c89a70'].map(hex3);
+    glow(c, 0, 0, R * 1.15, '#ffd8a8', .18);
+    PUT(c, renderSphere(R, 1301, (x, y, z, o) => {
+      const t = y * 4.2 + (fbm(x * 2 + o[0], y * 9 + o[1], z * 2 + o[2], 5) - .5) * 1.1;
+      let col = ramp(pal, (Math.sin(t * 3.1) + 1) / 2 * .5 + (Math.sin(t * 7.3 + 1) + 1) / 2 * .3 + fbm(x * 6, y * 24, z * 6, 3) * .2);
+      const sx = (x - .32) / .22, sy = (y - .38) / .11, e2 = sx * sx + sy * sy; if (e2 < 1) col = mix3(col, hex3('#b8543a'), (1 - e2) * .9);
+      return col;
+    }, { amb: .02, atmo: [255, 230, 200], atmoA: .25 }));
+  } else { // 고리 행성
+    const pr = R * .6, pal = ['#f0e2bc', '#d8c08a', '#c4a46c', '#ead6a6'].map(hex3);
+    c.save(); c.rotate(-.3);
+    const ring = (front) => {
+      c.save(); c.beginPath(); front ? c.rect(-R * 2, 0, R * 4, R * 2) : c.rect(-R * 2, -R * 2, R * 4, R * 2); c.clip();
+      for (let i = 0; i < 90; i++) {
+        const t = i / 89, rr = pr * (1.25 + t * 1.0); if (Math.abs(rr / pr - 1.95) < .04) continue;
+        const a = (.25 + .5 * fbm(t * 30, 1, 1, 2)) * (t < .15 ? t / .15 : 1) * (front ? 1 : .8);
+        c.strokeStyle = `rgba(${220 - t * 40 | 0},${200 - t * 50 | 0},${160 - t * 60 | 0},${a})`; c.lineWidth = 1.2;
+        c.beginPath(); c.ellipse(0, 0, rr, rr * .3, 0, 0, TAU); c.stroke();
+      }
+      c.restore();
+    };
+    ring(false);
+    PUT(c, renderSphere(pr, 1302, (x, y, z, o) => ramp(pal, (Math.sin((y * 3.5 + (fbm(x * 2 + o[0], y * 8 + o[1], z * 2, 4) - .5) * .4) * 3) + 1) / 2), { amb: .02 }));
+    ring(true);
+    c.restore();
+  }
+};
+const PLANET_OLD = DRAW[13];
+function planetSphere(c, R, seed, tex, opt) { PUT(c, renderSphere(R, seed, tex, opt)); }
+DRAW[13] = (c, R, q, v) => { // 0 수성 1 금성 2 지구 3 화성 4 목성 5 토성 6 천왕성 7 해왕성
+  if (v === 2) return PLANET_OLD(c, R, q, 0);
+  if (v === 4) return PLANET_OLD(c, R, q, 1);
+  if (v === 5) return PLANET_OLD(c, R, q, 2);
+  if (v === 0) { // 수성: 회색 크레이터
+    const pal = ['#3a3836', '#6e6a66', '#a8a29a'].map(hex3);
+    const crs = Array.from({ length: 22 }, () => { const z = q() * 1.2 - .2, a = q() * TAU, sn = Math.sqrt(Math.max(0, 1 - z * z)); return [Math.cos(a) * sn, Math.sin(a) * sn, z, .04 + q() * .12]; });
+    return planetSphere(c, R * .55, 1310, (x, y, z, o) => {
+      let col = ramp(pal, sstep(.3, .7, fbm(x * 3 + o[0], y * 3 + o[1], z * 3 + o[2], 5)));
+      for (const k of crs) { const dd = Math.acos(Math.min(1, x * k[0] + y * k[1] + z * k[2])) / k[3]; if (dd < 1) col = mix3(col, [0, 0, 0], .3 * (1 - dd * dd)); else if (dd < 1.25) col = mix3(col, [255, 255, 255], (1.25 - dd) * .6); }
+      return col;
+    }, { amb: .02 });
+  }
+  if (v === 1) { // 금성: 두꺼운 노란 구름
+    glow(c, 0, 0, R * 1.15, '#ffe6b0', .2);
+    const pal = ['#b88a48', '#e0c080', '#f4e2b4'].map(hex3);
+    return planetSphere(c, R * .92, 1311, (x, y, z, o) => ramp(pal, sstep(.25, .75, fbm(x * 1.5 + o[0] + y * .8, y * 3 + o[1], z * 1.5 + o[2], 5))), { amb: .03, atmo: [255, 230, 180], atmoA: .5 });
+  }
+  if (v === 3) { // 화성: 붉은 땅, 어두운 지역, 극관
+    glow(c, 0, 0, R * 1.1, '#ff9a6a', .12);
+    const pal = ['#5a2a18', '#a8502a', '#d0784a', '#e8a070'].map(hex3);
+    return planetSphere(c, R * .6, 1312, (x, y, z, o) => {
+      let col = ramp(pal, sstep(.3, .72, fbm(x * 2 + o[0], y * 2 + o[1], z * 2 + o[2], 6)));
+      if (y < -.86 + (fbm(x * 4, y * 4, z * 4, 3) - .5) * .2) col = mix3(col, [245, 240, 235], .9);
+      return col;
+    }, { amb: .02, atmo: [255, 170, 120], atmoA: .25 });
+  }
+  if (v === 6) { // 천왕성: 옅은 청록, 세로 고리
+    const pal = ['#9ad8e0', '#b8eef0', '#d0f6f6'].map(hex3);
+    c.strokeStyle = 'rgba(200,230,240,.18)'; c.lineWidth = 1.2; c.beginPath(); c.ellipse(0, 0, R * .22, R * 1.05, .15, 0, TAU); c.stroke();
+    planetSphere(c, R * .8, 1313, (x, y, z, o) => ramp(pal, (fbm(x * 2 + o[0], y * 4 + o[1], z * 2, 3) - .3) * 1.4), { amb: .03, atmo: [180, 240, 255], atmoA: .5 });
+    c.save(); c.beginPath(); c.rect(-R * 2, -R * 2, R * 2, R * 4); c.clip(); c.strokeStyle = 'rgba(200,230,240,.25)'; c.beginPath(); c.ellipse(0, 0, R * .22, R * 1.05, .15, -Math.PI / 2, Math.PI / 2, true); c.stroke(); c.restore();
+    return;
+  }
+  // 해왕성: 짙은 파랑, 어두운 점, 흰 구름 줄
+  const pal = ['#1a3a9a', '#2a5ad0', '#4a7ae8'].map(hex3);
+  planetSphere(c, R * .78, 1314, (x, y, z, o) => {
+    let col = ramp(pal, (fbm(x * 2 + o[0], y * 6 + o[1], z * 2, 4) - .25) * 1.5);
+    const sx = (x + .2) / .2, sy = (y + .25) / .11, e = sx * sx + sy * sy; if (e < 1) col = mix3(col, [10, 20, 70], (1 - e) * .8);
+    const cl = fbm(x * 3, y * 18 + o[2], z * 3, 3); if (cl > .64) col = mix3(col, [230, 240, 255], (cl - .64) * 4);
+    return col;
+  }, { amb: .03, atmo: [120, 170, 255], atmoA: .7 });
+};
+DRAW[14] = (c, R, q, v) => { // 갈색외성
+  glow(c, 0, 0, R * 1.4, '#c0304a', .25);
+  const pal = ['#2a0c0a', '#5a1e14', '#8a3a22', '#3e1410'].map(hex3);
+  PUT(c, renderSphere(R, 1400 + v, (x, y, z, o) => { const n = fbm(x * 2 + o[0], y * 7 + o[1], z * 2 + o[2], 5); return ramp(pal, (Math.sin((y * 5 + (n - .5) * 1.4) * 2.6) + 1) / 2 * .7 + n * .3); }, { emissive: true, limb: .5 }));
+};
+DRAW[15] = (c, R, q, v) => { // 적색외성
+  glow(c, 0, 0, R * 1.6, '#ff4a1a', .5); glow(c, 0, 0, R * 1.05, '#ff8a4a', .5);
+  const pal = ['#8a1a06', '#e04a14', '#ff8a3a', '#ffc080'].map(hex3);
+  PUT(c, renderSphere(R * .82, 1500 + v, (x, y, z, o) => {
+    let col = ramp(pal, fbm(x * 9 + o[0], y * 9 + o[1], z * 9 + o[2], 4) * 1.2 - .05);
+    const sp = fbm(x * 2.2 + o[1], y * 2.2 + o[2], z * 2.2, 4); if (sp > .64) col = mix3(col, [60, 10, 0], sstep(.64, .7, sp) * .8);
+    return col;
+  }, { emissive: true, limb: .55 }));
+};
+DRAW[16] = (c, R, q, v) => { // 적색거성
+  glow(c, 0, 0, R * 1.6, '#ff6a20', .45);
+  const pal = ['#7a1a04', '#c8420e', '#ff7a28', '#ffb860', '#ffe0a8'].map(hex3);
+  PUT(c, renderSphere(R * .95, 1600 + v, (x, y, z, o) => ramp(pal, fbm(x * 3.2 + o[0], y * 3.2 + o[1], z * 3.2 + o[2], 5) * 1.3 - .15), { emissive: true, limb: .65 }));
+};
+DRAW[17] = (c, R, q, v) => { // 초거성
+  glow(c, 0, 0, R * 1.6, '#8ab0ff', .75);
+  c.globalCompositeOperation = 'lighter';
+  for (let k = 0; k < 4; k++) {
+    c.save(); c.rotate(k * Math.PI / 2 + .3);
+    const lg = c.createLinearGradient(0, 0, R * 1.6, 0); lg.addColorStop(0, 'rgba(230,240,255,.5)'); lg.addColorStop(1, 'rgba(150,190,255,0)');
+    c.fillStyle = lg; c.beginPath(); c.moveTo(0, -1.5); c.lineTo(R * 1.6, 0); c.lineTo(0, 1.5); c.fill(); c.restore();
+  }
+  glow(c, 0, 0, R * .9, '#d8e4ff', .6);
+  c.globalCompositeOperation = 'source-over';
+  const pal = ['#8aa8ff', '#c8d8ff', '#ffffff'].map(hex3);
+  PUT(c, renderSphere(R * .55, 1700 + v, (x, y, z, o) => ramp(pal, fbm(x * 7 + o[0], y * 7 + o[1], z * 7 + o[2], 4) * 1.3 - .1), { emissive: true, limb: .4 }));
+};
+DRAW[18] = (c, R, q) => { // 중성자별
+  glow(c, 0, 0, R * 1.1, '#7af0ff', .45);
+  c.globalCompositeOperation = 'lighter';
+  for (const s of [-1, 1]) {
+    const lg = c.createLinearGradient(0, 0, 0, s * R * 1.6); lg.addColorStop(0, 'rgba(255,255,255,.8)'); lg.addColorStop(.4, 'rgba(120,200,255,.3)'); lg.addColorStop(1, 'rgba(120,200,255,0)');
+    c.fillStyle = lg; c.beginPath(); c.moveTo(-2, 0); c.lineTo(-R * .16, s * R * 1.6); c.lineTo(R * .16, s * R * 1.6); c.lineTo(2, 0); c.fill();
+  }
+  c.strokeStyle = 'rgba(140,200,255,.18)'; c.lineWidth = 1;
+  for (let i = 1; i <= 4; i++) { const w = R * .18 * i; c.beginPath(); c.ellipse(-w, 0, w, w * .9, 0, 0, TAU); c.stroke(); c.beginPath(); c.ellipse(w, 0, w, w * .9, 0, 0, TAU); c.stroke(); }
+  glow(c, 0, 0, R * .5, '#ffffff', .7);
+  c.globalCompositeOperation = 'source-over';
+  PUT(c, renderSphere(R * .24, 1800, (x, y, z, o) => ramp([[200, 230, 255], [255, 255, 255]], fbm(x * 5 + o[0], y * 5, z * 5, 3)), { emissive: true, limb: .3 }));
+};
+// 블랙홀: 휘어진 빛(렌즈) 고리가 그림자를 감싸고, 앞쪽 원반이 그림자를 가로지름. 왼쪽이 더 밝음(도플러 효과)
+function blackHole(c, R, q, pal, opt) {
+  glow(c, 0, 0, R * 1.5, pal[2], .14);
+  c.globalCompositeOperation = 'lighter';
+  if (opt.jets) for (const s of [-1, 1]) {
+    const lg = c.createLinearGradient(0, 0, 0, s * R * 1.6); lg.addColorStop(0, 'rgba(200,230,255,.8)'); lg.addColorStop(.5, hexA(opt.jets, .3)); lg.addColorStop(1, hexA(opt.jets, 0));
+    c.fillStyle = lg; c.beginPath(); c.moveTo(-R * .04, 0); c.lineTo(-R * .1, s * R * 1.6); c.lineTo(R * .1, s * R * 1.6); c.lineTo(R * .04, 0); c.fill();
+  }
+  const tilt = .2, sd = q() * 50;
+  const disk = () => {
+    for (let i = 0; i < 80; i++) {
+      const t = i / 79, rr = R * (.46 + .6 * t), a = (Math.pow(1 - t, 1.5) * .5 + .02) * (.6 + .8 * vnoise(t * 22, .5, sd));
+      const g = c.createLinearGradient(-rr, 0, rr, 0);
+      g.addColorStop(0, hexA(pal[0], Math.min(1, a * 1.9))); g.addColorStop(.5, hexA(pal[1], a)); g.addColorStop(1, hexA(pal[2], a * .25));
+      c.strokeStyle = g; c.lineWidth = R * .014; c.beginPath(); c.ellipse(0, 0, rr, rr * tilt, 0, 0, TAU); c.stroke();
+    }
+  };
+  disk();
+  // 원반의 뒷면이 블랙홀 중력에 휘어 그림자 위·아래를 감싸는 고리처럼 보임
+  for (let i = 0; i < 18; i++) {
+    const t = i / 17, rr = R * (.4 + .2 * t);
+    const g = c.createLinearGradient(-rr * .6, -rr, rr * .6, rr);
+    g.addColorStop(0, hexA(pal[0], (1 - t) * .75 + .04)); g.addColorStop(.5, hexA(pal[1], (1 - t) * .32)); g.addColorStop(1, hexA(pal[2], (1 - t) * .08));
+    c.strokeStyle = g; c.lineWidth = R * .014; c.beginPath(); c.ellipse(0, -R * .02 * (1 - t), rr, rr * (.9 + .08 * t), 0, 0, TAU); c.stroke();
+  }
+  c.globalCompositeOperation = 'source-over';
+  // 사건의 지평선 그림자: 완전한 검정, 가장자리만 살짝 번짐
+  const sg = c.createRadialGradient(0, 0, R * .3, 0, 0, R * .4);
+  sg.addColorStop(0, 'rgba(0,0,0,1)'); sg.addColorStop(.85, 'rgba(0,0,0,1)'); sg.addColorStop(1, 'rgba(0,0,0,0)');
+  c.fillStyle = sg; circle(c, 0, 0, R * .4); c.fill();
+  // 앞쪽 원반이 그림자 앞을 지나감
+  c.save(); c.beginPath(); c.rect(-R * 3, 0, R * 6, R * 3); c.clip(); c.globalCompositeOperation = 'lighter'; disk(); c.restore();
+  // 광자 고리: 아주 얇고 밝은 빛의 고리 (왼쪽이 더 밝음)
+  c.globalCompositeOperation = 'lighter';
+  const pg = c.createLinearGradient(-R * .37, 0, R * .37, 0); pg.addColorStop(0, 'rgba(255,250,235,1)'); pg.addColorStop(1, 'rgba(255,200,150,.35)');
+  c.strokeStyle = pg; c.lineWidth = 1.6; circle(c, 0, 0, R * .372); c.stroke();
+  c.globalAlpha = .45; c.lineWidth = .8; circle(c, 0, 0, R * .394); c.stroke(); c.globalAlpha = 1;
+  glow(c, 0, 0, R * .5, pal[0], .08);
+  c.globalCompositeOperation = 'source-over';
+}
+// 블랙홀 둘레의 빽빽한 별 무리 (그림만, 히트박스는 블랙홀뿐)
+function starHalo(c, R, q, ext) {
+  glow(c, 0, 0, R * ext, '#ffe8c8', .38); glow(c, 0, 0, R * ext * .5, '#fff0d8', .4);
+  c.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 7000; i++) {
+    const r = R * .42 + R * (ext - .42) * Math.pow(q(), 1.8), a = q() * TAU, x = Math.cos(a) * r, y = Math.sin(a) * r * .85;
+    const k = q(), col = k < .15 ? '170,200,255' : k < .55 ? '255,228,185' : '255,250,240';
+    c.fillStyle = `rgba(${col},${.2 + q() * .55})`; const sz = q() < .02 ? 2.2 : 1.1; c.fillRect(x, y, sz, sz);
+  }
+  for (let i = 0; i < 16; i++) { const r = R * (.6 + q() * (ext - .7)), a = q() * TAU; glow(c, Math.cos(a) * r, Math.sin(a) * r * .85, 4 + q() * 4, pick(q, ['#ffffff', '#cfe0ff', '#ffd8a0']), .7); }
+  c.globalCompositeOperation = 'source-over';
+}
+DRAW[19] = (c, R, q) => blackHole(c, R, q, ['#fff2d8', '#ffa040', '#c84010'], {});
+DRAW[20] = (c, R, q) => { starHalo(c, R, q, 3.1); blackHole(c, R, q, ['#fff6e8', '#ffb060', '#a83a18'], {}); };
+// 현실적인 은하 그림: 로그 나선팔 + 지수형 원반 + 중심 팽대부 + 먼지 띠(빛 흡수) + 분홍 별 생성 구역
+function renderGalaxy(S, Rg, seed, o) {
+  const cv = mk(S, S), c = cv.getContext('2d'), img = c.createImageData(S, S), D = img.data, C = S / 2;
+  const q = rng(seed), ox = q() * 50, oy = q() * 50, arms = o.arms, k = 1 / Math.tan(o.pitch), incl = o.incl;
+  const rot = q() * TAU, cr = Math.cos(rot), sr = Math.sin(rot), bk = o.bulge == null ? 1 : o.bulge;
+  const BUL = [255, 224, 168], DSK = [150, 182, 255], HII = [255, 110, 165], DUST = [110, 70, 45];
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const X = (x + .5 - C) / Rg, Y = (y + .5 - C) / Rg, u = X * cr + Y * sr, w = (-X * sr + Y * cr) / incl, r = Math.hypot(u, w);
+    if (r > 1.15) continue;
+    const th = Math.atan2(w, u), n1 = fbm(u * 3 + ox, w * 3 + oy, 1.1, 4), n2 = fbm(u * 10 + oy, w * 10 + ox, 2.3, 3);
+    const ph = arms * (th - k * Math.log(r + .02)) + (n1 - .5) * o.flocc * 6;
+    const arm = Math.pow(.5 + .5 * Math.cos(ph), o.sharp);
+    const dust = Math.pow(.5 + .5 * Math.cos(ph - .9), 5) * sstep(.08, .3, r) * (.45 + n2) * (o.incl < .6 ? 1.3 : 1);
+    const clump = .45 + 1.3 * Math.pow(n2, 1.6); // 별 무리의 얼룩덜룩함
+    const disk = Math.exp(-r / .36) * (.3 + 1.4 * arm * clump) * (1 - sstep(.8, 1.15, r));
+    const bulge = (Math.exp(-Math.pow(r / .07, .8)) * 1.6 + Math.exp(-r / .13) * .45) * bk;
+    let b = disk + bulge, col = mix3(DSK, BUL, Math.min(1, bulge * 1.4 + Math.exp(-r / .16) * .55));
+    if (arm > .5 && n2 > .62 && r > .12) { const h = Math.min(1, (n2 - .62) * 5); col = mix3(col, HII, h); b += h * .5 * arm; }
+    const ab = Math.min(.85, dust * .8); b *= 1 - ab; col = mix3(col, DUST, ab * .6);
+    const sp = vnoise(u * 60 + ox, w * 60, 7.7); if (sp > .9) b += (sp - .9) * 4 * Math.exp(-r / .4); // 개별 별빛
+    const a = Math.min(1, b * 1.7), lum = Math.min(1.35, .7 + b);
+    const i = (y * S + x) * 4; D[i] = col[0] * lum; D[i + 1] = col[1] * lum; D[i + 2] = col[2] * lum; D[i + 3] = a * 255;
+  }
+  c.putImageData(img, 0, 0); return cv;
+}
+const GAL_TYPES = [
+  { arms: 2, pitch: .32, incl: 1, flocc: .15, sharp: 3 },   // 정면에서 본 큰 나선 은하
+  { arms: 2, pitch: .3, incl: .36, flocc: .2, sharp: 2 },   // 비스듬히 기운 은하 (안드로메다처럼)
+  { arms: 4, pitch: .45, incl: .8, flocc: .7, sharp: 1.5 }, // 팔이 여러 갈래로 흩어진 은하
+];
+DRAW[22] = (c, R, q, v) => c.drawImage(renderGalaxy(SPR, R * 1.55, 2200 + v, GAL_TYPES[v]), -SPR / 2, -SPR / 2);
+// 은하 중심 블랙홀: 블랙홀을 둘러싼 은하 (반 해상도로 만들고 2배로 키워 그림)
+function galaxyAround(c, R, q, ext, v) {
+  const S = 320, g = renderGalaxy(S, S / 2 * .97, 2100 + v, { arms: 2, pitch: .33, incl: .62, flocc: .25, sharp: 2.5, bulge: .55 });
+  c.drawImage(g, -R * ext, -R * ext, R * ext * 2, R * ext * 2);
+}
+DRAW[21] = (c, R, q, v) => { galaxyAround(c, R, q, 3.95, v); blackHole(c, R, q, ['#ffffff', '#ffc080', '#d06030'], { jets: '#6aa8ff' }); };
+DRAW[23] = (c, R, q, v) => { // 은하단: 노란 타원 은하들 + 은하단 사이의 빛 + 중력렌즈로 휘어진 파란 호
+  glow(c, 0, 0, R * 1.5, '#b88aff', .32); glow(c, 0, 0, R * 1.0, '#ffd0a0', .3); glow(c, 0, 0, R * .5, '#fff2d8', .35);
+  c.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 600; i++) { const a = q() * TAU, d = R * 1.2 * Math.pow(q(), .7); c.fillStyle = `rgba(255,240,220,${q() * .35})`; c.fillRect(Math.cos(a) * d, Math.sin(a) * d, 1.1, 1.1); }
+  // 중력렌즈 호
+  for (let i = 0; i < 4; i++) {
+    const rr = R * (.4 + q() * .5), a0 = q() * TAU, len = .18 + q() * .2;
+    for (let k = 0; k < 3; k++) { c.strokeStyle = `rgba(${150 + k * 30},${195 + k * 20},255,${.2 - k * .05})`; c.lineWidth = 2.4 - k * .7; c.beginPath(); c.arc(0, 0, rr + k * .5, a0, a0 + len); c.stroke(); }
+  }
+  // 은하들
+  const n = 46;
+  for (let i = 0; i < n; i++) {
+    const a = q() * TAU, d = R * 1.05 * Math.pow(q(), .9), x = Math.cos(a) * d, y = Math.sin(a) * d, big = i < 3;
+    const sz = big ? 9 + q() * 6 : 2.5 + q() * 5, ell = q() < .7;
+    c.save(); c.translate(x, y); c.rotate(q() * TAU); c.scale(1, ell ? .55 + q() * .4 : .35 + q() * .3);
+    const col = ell ? pick(q, ['#ffe2a8', '#ffd28a', '#fff0d0']) : pick(q, ['#b8d0ff', '#d8e4ff', '#ffc8e0']);
+    glow(c, 0, 0, sz * 2.4, col, big ? .7 : .55); glow(c, 0, 0, sz * .6, '#ffffff', .95);
+    if (!ell) { c.strokeStyle = hexA(col, .5); c.lineWidth = 1; c.beginPath(); c.arc(0, 0, sz * 1.2, 0, 4); c.stroke(); }
+    c.restore();
+  }
+  glow(c, 0, 0, 14, '#ffffff', .9);
+  c.globalCompositeOperation = 'source-over';
+};
+DRAW[24] = (c, R, q, v) => { // 초은하단: 빛나는 우주 거대 구조의 실타래
+  glow(c, 0, 0, R * 1.55, '#6a5aff', .22); glow(c, 0, 0, R * .9, '#ff8ad0', .14);
+  const nodes = []; for (let i = 0; i < 34; i++) { const a = q() * TAU, d = R * 1.15 * Math.sqrt(q()); nodes.push([Math.cos(a) * d, Math.sin(a) * d, q()]); }
+  c.globalCompositeOperation = 'lighter';
+  const COLS = [[255, 210, 140], [170, 190, 255], [255, 150, 210], [150, 255, 230]];
+  for (const n of nodes) {
+    const near = nodes.map(m => [Math.hypot(m[0] - n[0], m[1] - n[1]), m]).sort((a, b) => a[0] - b[0]).slice(1, 3 + (q() * 2 | 0));
+    for (const [, m] of near) {
+      const C = COLS[(n[2] * 4) | 0];
+      const mx = (n[0] + m[0]) / 2 + (q() - .5) * 14, my = (n[1] + m[1]) / 2 + (q() - .5) * 14;
+      for (const [lw, a] of [[10, .05], [5, .1], [2.2, .3], [1, .7]]) { c.strokeStyle = `rgba(${C[0]},${C[1]},${C[2]},${a})`; c.lineWidth = lw; c.beginPath(); c.moveTo(n[0], n[1]); c.quadraticCurveTo(mx, my, m[0], m[1]); c.stroke(); }
+      for (let k = 0; k < 14; k++) { const t = q(), x = (1 - t) * (1 - t) * n[0] + 2 * (1 - t) * t * mx + t * t * m[0], y = (1 - t) * (1 - t) * n[1] + 2 * (1 - t) * t * my + t * t * m[1]; c.fillStyle = 'rgba(255,250,240,.8)'; c.fillRect(x + (q() - .5) * 5, y + (q() - .5) * 5, 1.4, 1.4); }
+    }
+  }
+  for (const n of nodes) { const C = COLS[(n[2] * 4) | 0], col = '#' + C.map(v => v.toString(16).padStart(2, '0')).join(''); glow(c, n[0], n[1], 12 + q() * 12, col, .75); glow(c, n[0], n[1], 4, '#ffffff', 1); }
+  c.globalCompositeOperation = 'source-over';
+};
+DRAW[25] = (c, R, q) => { // 관측 가능한 우주: 우주배경복사 얼룩 + 안쪽의 거대 구조 + 무지갯빛 테두리
+  glow(c, 0, 0, R * 1.55, '#ffb070', .45); glow(c, 0, 0, R * 1.3, '#7a9aff', .25);
+  c.save(); circle(c, 0, 0, R); c.clip();
+  const cmb = c.createRadialGradient(0, 0, 0, 0, 0, R); cmb.addColorStop(0, '#1a0820'); cmb.addColorStop(.7, '#3a1020'); cmb.addColorStop(1, '#ff7a3a');
+  c.fillStyle = cmb; c.fillRect(-R, -R, R * 2, R * 2);
+  c.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 700; i++) { const a = q() * TAU, d = Math.sqrt(q()) * R; glow(c, Math.cos(a) * d, Math.sin(a) * d, 3 + q() * 9, pick(q, ['#ff4d2e', '#ffb03b', '#ffe08a', '#3b7dff', '#2ec5ff', '#c86bff']), .28); }
+  for (let i = 0; i < 70; i++) { const x1 = (q() - .5) * 1.8 * R, y1 = (q() - .5) * 1.8 * R; c.strokeStyle = `rgba(255,240,220,${.12 + q() * .2})`; c.lineWidth = 1; c.beginPath(); c.moveTo(x1, y1); c.lineTo(x1 + (q() - .5) * R * .6, y1 + (q() - .5) * R * .6); c.stroke(); }
+  for (let i = 0; i < 250; i++) { c.fillStyle = `rgba(255,255,255,${q() * .8})`; const a = q() * TAU, d = Math.sqrt(q()) * R; c.fillRect(Math.cos(a) * d, Math.sin(a) * d, 1.2, 1.2); }
+  c.restore();
+  c.globalCompositeOperation = 'lighter';
+  if (c.createConicGradient) { const cg = c.createConicGradient(q() * TAU, 0, 0); ['#ff7a3a', '#ffd06a', '#7affc8', '#6ab8ff', '#c87aff', '#ff7a3a'].forEach((s, i, a) => cg.addColorStop(i / (a.length - 1), s)); c.strokeStyle = cg; }
+  else c.strokeStyle = '#ffcf9a';
+  c.globalAlpha = .9; c.lineWidth = 3; circle(c, 0, 0, R); c.stroke(); c.globalAlpha = .35; c.lineWidth = 12; c.stroke(); c.globalAlpha = 1;
+  c.globalCompositeOperation = 'source-over';
+};
+DRAW[26] = (c, R, q) => { // 거품우주: 무지갯빛 비눗방울 같은 우주
+  glow(c, 0, 0, R * 1.55, '#c8a0ff', .4); glow(c, 0, 0, R * 1.2, '#7affe0', .15);
+  c.save(); circle(c, 0, 0, R * .96); c.clip();
+  const g = c.createRadialGradient(0, 0, R * .1, 0, 0, R); g.addColorStop(0, 'rgba(60,30,120,.25)'); g.addColorStop(.75, 'rgba(120,80,220,.18)'); g.addColorStop(1, 'rgba(255,255,255,.35)');
+  c.fillStyle = g; c.fillRect(-R, -R, R * 2, R * 2);
+  c.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 14; i++) { const a = q() * TAU, d = Math.sqrt(q()) * R * .7; glow(c, Math.cos(a) * d, Math.sin(a) * d, R * (.15 + q() * .25), pick(q, ['#ff6ad5', '#6ab8ff', '#7affc8', '#ffd06a']), .22); }
+  for (let i = 0; i < 160; i++) { const a = q() * TAU, d = Math.sqrt(q()) * R * .9; c.fillStyle = `rgba(255,255,255,${q() * .8})`; c.fillRect(Math.cos(a) * d, Math.sin(a) * d, 1.4, 1.4); }
+  // 무지개 막의 소용돌이 무늬
+  for (let i = 0; i < 10; i++) { c.strokeStyle = `hsla(${q() * 360},100%,75%,.22)`; c.lineWidth = 3 + q() * 4; c.beginPath(); c.arc((q() - .5) * R * .4, (q() - .5) * R * .4, R * (.6 + q() * .35), q() * TAU, q() * TAU + 1.5); c.stroke(); }
+  c.restore();
+  c.globalCompositeOperation = 'lighter';
+  if (c.createConicGradient) { const cg = c.createConicGradient(q() * TAU, 0, 0); ['#ff6ad5', '#c774e8', '#ad8cff', '#8795e8', '#94d0ff', '#7affc8', '#fff28a', '#ff9a6a', '#ff6ad5'].forEach((s, i, a) => cg.addColorStop(i / (a.length - 1), s)); c.strokeStyle = cg; }
+  else c.strokeStyle = '#d8b8ff';
+  c.globalAlpha = .95; c.lineWidth = 6; circle(c, 0, 0, R * .96); c.stroke(); c.globalAlpha = .4; c.lineWidth = 18; c.stroke(); c.globalAlpha = 1;
+  // 둘레의 작은 아기 거품 우주들
+  for (let i = 0; i < 7; i++) { const a = q() * TAU, d = R * (1.12 + q() * .3), r = R * (.05 + q() * .08); c.strokeStyle = `hsla(${q() * 360},100%,80%,.7)`; c.lineWidth = 1.5; circle(c, Math.cos(a) * d, Math.sin(a) * d, r); c.stroke(); glow(c, Math.cos(a) * d, Math.sin(a) * d, r * 1.6, '#d8c8ff', .3); }
+  c.globalCompositeOperation = 'source-over';
+  c.fillStyle = 'rgba(255,255,255,.7)'; c.beginPath(); c.ellipse(-R * .45, -R * .52, R * .22, R * .07, -.7, 0, TAU); c.fill();
+  c.fillStyle = 'rgba(255,255,255,.35)'; c.beginPath(); c.ellipse(R * .5, R * .5, R * .1, R * .035, -.7, 0, TAU); c.fill();
+};
+function drawDebris(c, R, q, col) { // 깨져 나온 조각
+  glow(c, 0, 0, R * 1.3, col, .3);
+  const p = irr(q, 7, R * .55, R);
+  polyPath(c, p); const g = c.createRadialGradient(-R * .3, -R * .3, 0, 0, 0, R); g.addColorStop(0, '#7a6e64'); g.addColorStop(1, '#221c18'); c.fillStyle = g; c.fill();
+  c.strokeStyle = hexA(col, .85); c.lineWidth = 3; c.stroke();
+  c.save(); polyPath(c, p); c.clip(); c.fillStyle = hexA(col, .22); c.fillRect(-R, -R, R * 2, R * 2); c.strokeStyle = hexA(col, .7); c.lineWidth = 2;
+  for (let i = 0; i < 3; i++) { let x = (q() - .5) * R, y = (q() - .5) * R; c.beginPath(); c.moveTo(x, y); for (let k = 0; k < 4; k++) { x += (q() - .5) * R * .5; y += (q() - .5) * R * .5; c.lineTo(x, y); } c.stroke(); }
+  c.restore();
+}
+
+const SPRITES = [], DEBRIS = [];
+const VARS = s => s === 13 ? 8 : 3;
+const CANVAS = s => s === 20 ? 512 : s === 21 ? 640 : SPR; // 별 무리가 블랙홀 밖으로 넓게 퍼지도록
+const PLANETS = ['수성', '금성', '지구', '화성', '목성', '토성', '천왕성', '해왕성'];
+const BIG = st => st >= 23 && st <= 26 ? 1.2 : 1; // 그림만 크게
+const sprOf = (st, v) => { const a = SPRITES[st]; return a[v % a.length]; };
+function buildSprites() {
+  for (let s = 0; s < 27; s++) {
+    SPRITES[s] = [];
+    for (let v = 0; v < VARS(s); v++) {
+      const S = CANVAS(s), cv = mk(S, S), c = cv.getContext('2d');
+      c.translate(S / 2, S / 2);
+      DRAW[s](c, SR, rng(s * 101 + v * 7 + 3), v);
+      SPRITES[s][v] = cv;
+    }
+  }
+  for (let s = 0; s < 27; s++) { DEBRIS[s] = []; for (let v = 0; v < 2; v++) { const cv = mk(SPR, SPR), c = cv.getContext('2d'); c.translate(SPR / 2, SPR / 2); drawDebris(c, SR, rng(900 + s * 13 + v), STAGES[s].c); DEBRIS[s][v] = cv; } }
+}
+
+/* ───────────────────────── 배경 테마 ───────────────────────── */
+// 실제 우주 사진 (출처는 시작 화면에 표시)
+const PHOTOS = {};
+for (const [k, src] of [['mw', 'space-milkyway.jpg'], ['hudf', 'space-deepfield.jpg']]) { const im = new Image(); im.onload = () => { PHOTOS[k] = im; }; im.src = src; }
+const THEMES = {
+  quantum: { bg: ['#0b0420', '#24104a', '#040110'], neb: ['#ff3d9a', '#7a3dff', '#3dd6ff', '#ff8a3d'], nebA: .55, layers: ['sparkle', 'sparkle', 'sparkle'], twinkle: ['#ffd6ff', '#b0e0ff', '#ffffff'], drift: [6, -4] },
+  water:   { bg: ['#021a2e', '#065078', '#010c18'], neb: ['#00c8ff', '#2060ff', '#00ffd0'], nebA: .45, layers: ['bubbles', 'bubbles', 'bubbles'], rays: '#9ae8ff', drift: [0, -18] },
+  hydrogen: { bg: ['#05020a', '#12061a', '#000000'], neb: ['#ff3d6b', '#3dd6ff'], nebA: .3, layers: ['stars', 'stars', 'stars'], twinkle: ['#ffffff', '#ffd0e0', '#cfe8ff'], drift: [0, 0], photo: 'h2', pScale: 1.5, flipX: true, pPar: .05 },
+  micro:   { bg: ['#03140f', '#0e3a2a', '#010806'], neb: ['#3dffb0', '#b6ff3d', '#3dafff', '#ff9ad8'], nebA: .38, layers: ['cells', 'cells', 'cells'], drift: [5, 3], photo: 'cells', pScale: 1.5, flipX: true, pPar: .12 },
+  earth:   { bg: ['#1c1008', '#4a2a12', '#0c0602'], neb: ['#ff9a3d', '#ffd27a', '#ff5d3d', '#ffb0a0'], nebA: .38, layers: ['dust', 'dust', 'dust'], rays: '#ffd8a0', drift: [8, 2], photo: 'sand', pScale: 1.7, flipX: true, pPar: .15, pDark: .3 },
+  space:   { bg: ['#01020a', '#0a1236', '#000004'], neb: ['#3a5aa8', '#a8344a', '#3a8a9a', '#5a4aa0'], nebA: .42, layers: ['stars', 'stars', 'stars'], twinkle: ['#ffffff', '#cfe0ff', '#ffe6c8'], drift: [0, 0], photo: 'mw', pScale: 2.2 },
+  deep:    { bg: ['#000000', '#140628', '#000000'], neb: ['#a8501a', '#6a2a8a', '#2a3a8a', '#8a2a3a'], nebA: .4, layers: ['stars', 'stars', 'stars'], twinkle: ['#ffffff', '#ffd8b0'], drift: [0, 0], photo: 'mw', pScale: 4.2, pDark: .3 },
+  cosmic:  { bg: ['#000004', '#060820', '#000000'], neb: ['#5a7dff', '#c83dff', '#3dc8ff'], nebA: .32, layers: ['stars', 'galaxies', 'galaxies'], twinkle: ['#ffffff', '#c8d8ff'], drift: [0, 0], photo: 'hudf', pScale: 1.3, flipX: true },
+  beyond:  { bg: ['#0a0012', '#2a0a40', '#000000'], neb: ['#ff3d6b', '#ffb03d', '#3d8bff', '#c86bff'], nebA: .5, layers: ['stars', 'bubbles', 'sparkle'], twinkle: ['#ffffff', '#ffd0f0', '#d0e0ff'], drift: [0, -3], photo: 'hudf', pScale: 2.4, flipX: true, pDark: .15 },
+};
+function themeFor(st) {
+  if (st <= 1) return 'quantum'; if (st === 2) return 'hydrogen'; if (st === 3) return 'water'; if (st <= 6) return 'micro'; if (st <= 10) return 'earth';
+  if (st <= 18) return 'space'; if (st <= 21) return 'deep'; if (st <= 24) return 'cosmic'; return 'beyond';
+}
+const TILE = 512;
+function wrapDraw(c, x, y, fn) { for (const ox of [-TILE, 0, TILE]) for (const oy of [-TILE, 0, TILE]) fn(x + ox, y + oy); }
+function buildTheme(th, seed) {
+  const q = rng(seed);
+  // 성운
+  th.nebImg = mk(TILE, TILE); let c = th.nebImg.getContext('2d'); c.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 30; i++) {
+    const x = q() * TILE, y = q() * TILE, r = 50 + q() * 190, col = pick(q, th.neb), a = .05 + q() * .13;
+    wrapDraw(c, x, y, (X, Y) => { if (X + r < 0 || Y + r < 0 || X - r > TILE || Y - r > TILE) return; glow(c, X, Y, r, col, a); });
+  }
+  // 어두운 먼지
+  c.globalCompositeOperation = 'source-over';
+  for (let i = 0; i < 8; i++) { const x = q() * TILE, y = q() * TILE, r = 40 + q() * 100; wrapDraw(c, x, y, (X, Y) => { const g = c.createRadialGradient(X, Y, 0, X, Y, r); g.addColorStop(0, 'rgba(0,0,0,.25)'); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.fillRect(X - r, Y - r, r * 2, r * 2); }); }
+  // 입자 층
+  th.layerImg = th.layers.map((style, L) => {
+    const cv = mk(TILE, TILE), c = cv.getContext('2d');
+    const counts = { stars: [420, 150, 45], sparkle: [60, 22, 8], bubbles: [60, 24, 9], cells: [26, 12, 5], dust: [130, 45, 14], galaxies: [0, 24, 7] }[style];
+    for (let i = 0; i < counts[L]; i++) {
+      const x = q() * TILE, y = q() * TILE;
+      wrapDraw(c, x, y, (X, Y) => {
+        if (X < -60 || Y < -60 || X > TILE + 60 || Y > TILE + 60) return;
+        const qq = rng((i + 1) * 7919 + L * 31 + seed);
+        if (style === 'stars') {
+          const s = [.5, .8, 1.2][L] + qq() * [.6, .8, 1.2][L], col = pick(qq, ['#ffffff', '#cfe0ff', '#ffe6c8', '#ffd0f0', '#bfefff']);
+          if (L === 2) glow(c, X, Y, s * 6, col, .3);
+          c.fillStyle = hexA(col, .45 + qq() * .55); circle(c, X, Y, s); c.fill();
+          if (L === 2 && qq() < .5) { c.fillStyle = hexA(col, .5); c.fillRect(X - s * 5, Y - .5, s * 10, 1); c.fillRect(X - .5, Y - s * 5, 1, s * 10); }
+        } else if (style === 'sparkle') {
+          const r = [2, 4, 8][L] + qq() * [3, 5, 10][L]; glow(c, X, Y, r, pick(qq, th.neb.concat(['#ffffff'])), .18 + qq() * .2); glow(c, X, Y, r * .25, '#ffffff', .35);
+        } else if (style === 'bubbles') {
+          const r = [2, 5, 10][L] + qq() * [4, 8, 14][L];
+          c.fillStyle = 'rgba(200,240,255,.05)'; circle(c, X, Y, r); c.fill();
+          c.strokeStyle = 'rgba(200,240,255,.35)'; c.lineWidth = 1; c.stroke();
+          c.strokeStyle = 'rgba(255,255,255,.7)'; c.beginPath(); c.arc(X, Y, r * .7, Math.PI * 1.1, Math.PI * 1.5); c.stroke();
+        } else if (style === 'cells') {
+          const r = [8, 16, 30][L] + qq() * [10, 20, 30][L], col = pick(qq, th.neb);
+          c.fillStyle = hexA(col, .06); circle(c, X, Y, r); c.fill(); c.strokeStyle = hexA(col, .2); c.lineWidth = 1.5; c.stroke();
+          glow(c, X + r * .2, Y - r * .1, r * .35, col, .18);
+        } else if (style === 'dust') {
+          const r = [1, 3, 8][L] + qq() * [1.5, 4, 14][L]; glow(c, X, Y, r, pick(qq, ['#ffd9a0', '#ffffff', '#ffb070']), [.6, .35, .18][L]);
+        } else if (style === 'galaxies') {
+          const s = [0, 3, 7][L] + qq() * [0, 4, 9][L], col = pick(qq, ['#ffe0b0', '#c0d0ff', '#ffc0e0']);
+          c.save(); c.translate(X, Y); c.rotate(qq() * TAU); c.scale(1, .35 + qq() * .6); glow(c, 0, 0, s * 2, col, .5); glow(c, 0, 0, s * .4, '#ffffff', .9); c.restore();
+        }
+      });
+    }
+    if (style === 'galaxies' || (style === 'stars' && L === 0)) for (let i = 0; i < 250; i++) { c.fillStyle = `rgba(255,255,255,${q() * .6})`; c.fillRect(q() * TILE, q() * TILE, 1, 1); }
+    return cv;
+  });
+  if (th.twinkle) th.tw = Array.from({ length: 50 }, () => ({ x: q() * 1024, y: q() * 1024, ph: q() * TAU, sp: .6 + q() * 2, s: 1 + q() * 2.4, col: pick(q, th.twinkle) }));
+}
+
+/* ── 그림으로 만든 배경 (수소 · 세균류 · 모래) ── */
+// 수소: 실제 수소 성운처럼 붉은 수소 빛(H-alpha) + 청록 산소 빛 + 검은 먼지 띠 + 어린 별
+function makeNebula(S) {
+  const cv = mk(S, S), c = cv.getContext('2d'), img = c.createImageData(S, S), D = img.data;
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const u = x / S * 4, v = y / S * 4;
+    const n = fbm(u, v, .3, 5), rd = 1 - Math.abs(fbm(u * 1.7 + 9, v * 1.7, 1.7, 5) * 2 - 1), fil = Math.pow(rd, 5);
+    const o3 = fbm(u * .8 + 20, v * .8, 4.4, 4), dust = sstep(.5, .7, fbm(u * 1.3 + 40, v * 1.3 + 7, 2.9, 5));
+    const dens = sstep(.36, .76, n) * .95 + fil * 1.1 * sstep(.3, .62, n);
+    let r = 255 * dens * 1.05 + 40 * fil, g = 40 * dens + 60 * fil, b = 85 * dens + 70 * fil;
+    const t = sstep(.52, .76, o3) * dens; r *= 1 - t * .65; g += 200 * t; b += 210 * t;
+    const k = 1 - dust * .92; r = r * k + 3; g = g * k + 3; b = b * k + 10;
+    const i = (y * S + x) * 4; D[i] = r; D[i + 1] = g; D[i + 2] = b; D[i + 3] = 255;
+  }
+  c.putImageData(img, 0, 0);
+  const q = rng(321); c.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 900; i++) { c.fillStyle = `rgba(255,255,255,${q() * .7})`; c.fillRect(q() * S, q() * S, 1, 1); }
+  for (let i = 0; i < 22; i++) { // 성운 속에서 태어난 푸른 별
+    const x = q() * S, y = q() * S, s2 = 1 + q() * 2.5; glow(c, x, y, s2 * 9, '#aac8ff', .55); glow(c, x, y, s2 * 2, '#ffffff', 1);
+    c.fillStyle = 'rgba(220,235,255,.5)'; c.fillRect(x - s2 * 12, y - .5, s2 * 24, 1); c.fillRect(x - .5, y - s2 * 12, 1, s2 * 24);
+  }
+  return cv;
+}
+// 세균류: 형광 현미경 사진처럼 초록 세포막, 파란 핵, 붉은 세포 골격 + 흐릿한 적혈구
+function makeCells(S) {
+  const cv = mk(S, S), c = cv.getContext('2d'), q = rng(77);
+  const bg = c.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S * .75); bg.addColorStop(0, '#071a1e'); bg.addColorStop(1, '#010406');
+  c.fillStyle = bg; c.fillRect(0, 0, S, S);
+  for (let i = 0; i < 26; i++) { // 초점이 안 맞은 적혈구 (가운데가 오목한 원반)
+    const x = q() * S, y = q() * S, r = 40 + q() * 55, g = c.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, 'rgba(150,25,40,.18)'); g.addColorStop(.55, 'rgba(190,40,55,.26)'); g.addColorStop(.85, 'rgba(225,70,80,.32)'); g.addColorStop(1, 'rgba(225,70,80,0)');
+    c.fillStyle = g; circle(c, x, y, r); c.fill();
+  }
+  c.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 15; i++) { // 형광 세포
+    const x = q() * S, y = q() * S, r = 50 + q() * 70, pts = irr(q, 11, r * .8, r).map(p => [p[0] + x, p[1] + y]);
+    for (let k = 0; k < 30; k++) { // 세포 골격 (붉은 실)
+      const a = q() * TAU, l = r * (.4 + q() * .55); c.strokeStyle = `rgba(255,${90 + q() * 60 | 0},50,${.12 + q() * .15})`; c.lineWidth = 1;
+      c.beginPath(); c.moveTo(x, y); c.quadraticCurveTo(x + Math.cos(a + .5) * l * .6, y + Math.sin(a + .5) * l * .6, x + Math.cos(a) * l, y + Math.sin(a) * l); c.stroke();
+    }
+    for (const [lw, a] of [[12, .06], [5, .16], [1.6, .6]]) { c.strokeStyle = `rgba(70,255,150,${a})`; c.lineWidth = lw; smoothPath(c, pts); c.stroke(); }
+    const nx = x + (q() - .5) * r * .4, ny = y + (q() - .5) * r * .4; glow(c, nx, ny, r * .5, '#3a6aff', .7); glow(c, nx, ny, r * .25, '#8ab0ff', .6);
+    for (let k = 0; k < 10; k++) glow(c, x + (q() - .5) * r * 1.2, y + (q() - .5) * r * 1.2, 2 + q() * 3, pick(q, ['#ffe86a', '#7affb0']), .7);
+  }
+  for (let i = 0; i < 260; i++) glow(c, q() * S, q() * S, 1.5 + q() * 2.5, pick(q, ['#7affff', '#c8ff7a', '#ff8ad8']), .55); // 떠다니는 작은 입자
+  return cv;
+}
+// 모래: 가까이서 본 모래 알갱이 바닥 (알갱이마다 색과 그림자, 반짝이는 석영). 이어 붙여도 이음새가 없게 만듦
+function makeSand(S) {
+  const cv = mk(S, S), c = cv.getContext('2d'), img = c.createImageData(S, S), D = img.data;
+  const G = 22, cell = S / G, q = rng(555), PTS = [], COL = [];
+  const PAL = [[232, 216, 180], [205, 165, 105], [214, 135, 72], [80, 68, 60], [222, 172, 160], [246, 240, 228], [180, 150, 110]].map(v => v);
+  for (let j = 0; j < G; j++) for (let i = 0; i < G; i++) { PTS.push([(i + .15 + q() * .7) * cell, (j + .15 + q() * .7) * cell]); COL.push([PAL[(q() * PAL.length) | 0], q()]); }
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const ci = Math.floor(x / cell), cj = Math.floor(y / cell);
+    let f1 = 1e9, f2 = 1e9, id = 0, fx = 0, fy = 0;
+    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+      const ii = (ci + di + G) % G, jj = (cj + dj + G) % G, pt = PTS[jj * G + ii];
+      const px = pt[0] + (ci + di - ii) * cell, py = pt[1] + (cj + dj - jj) * cell, dd = Math.hypot(x - px, y - py);
+      if (dd < f1) { f2 = f1; f1 = dd; id = jj * G + ii; fx = (x - px) / cell; fy = (y - py) / cell; } else if (dd < f2) f2 = dd;
+    }
+    const edge = sstep(0, .14, (f2 - f1) / cell), nx = fx / .75, ny = fy / .75, nz = Math.sqrt(Math.max(0, 1 - nx * nx - ny * ny));
+    const lam = Math.max(0, nx * LX + ny * LY + nz * LZ), [base, h] = COL[id];
+    let k = (.22 + .95 * lam) * (.25 + .75 * edge) * (.85 + .3 * vnoise(x * .3, y * .3, h * 9));
+    let r = base[0] * k, g = base[1] * k, b = base[2] * k;
+    if (h > .9 && lam > .9) { const gl = (lam - .9) * 10 * 200; r += gl; g += gl; b += gl; } // 석영 반짝임
+    const i = (y * S + x) * 4; D[i] = r; D[i + 1] = g; D[i + 2] = b; D[i + 3] = 255;
+  }
+  c.putImageData(img, 0, 0); return cv;
+}
+
+/* ───────────────────────── 캔버스 ───────────────────────── */
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+let W = 0, H = 0, DPR = 1;
+function resize() {
+  DPR = Math.min(2, window.devicePixelRatio || 1); W = innerWidth; H = innerHeight;
+  cv.width = W * DPR; cv.height = H * DPR; cv.style.width = W + 'px'; cv.style.height = H + 'px';
+}
+addEventListener('resize', resize); resize();
+
+/* ───────────────────────── 게임 상태 ───────────────────────── */
+const P = { x: 0, y: 0, vx: 0, vy: 0, m: 1.2, r: 1, st: 0, v: 0, inv: 0, maxSt: 0 };
+let objs = [], parts = [];
+let o0x = 0, o0y = 0, stageT = 0, broke = 0;
+const GAIN = .45; // 먹은 질량 중 성장에 쓰이는 비율
+const gainOf = o => o.own ? 1 : GAIN;
+let boosting = false, bhLevel = 0;
+// ── 소리 (Web Audio): 블랙홀 근처의 낮은 웅웅 소리 + 삼킬 때 '슈욱' 소리. M 키로 끄고 켬 ──
+const AU = { ctx: null, on: true, last: 0 };
+function initAudio() {
+  if (AU.ctx) { if (AU.ctx.state === 'suspended') AU.ctx.resume(); return; }
+  try {
+    const C = new (window.AudioContext || window.webkitAudioContext)(); AU.ctx = C;
+    AU.master = C.createGain(); AU.master.gain.value = .5; AU.master.connect(C.destination);
+    AU.drone = C.createGain(); AU.drone.gain.value = 0; AU.drone.connect(AU.master);
+    const lp = C.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 170; lp.Q.value = 4; lp.connect(AU.drone);
+    for (const f of [36, 54.3, 40.7]) { const o = C.createOscillator(); o.frequency.value = f; const g = C.createGain(); g.gain.value = .3; o.connect(g); g.connect(lp); o.start(); }
+    const buf = C.createBuffer(1, C.sampleRate * 2, C.sampleRate), d = buf.getChannelData(0); let l = 0;
+    for (let i = 0; i < d.length; i++) { l = (l + .02 * (Math.random() * 2 - 1)) / 1.02; d[i] = l * 3.5; }
+    const ns = C.createBufferSource(); ns.buffer = buf; ns.loop = true; const ng = C.createGain(); ng.gain.value = .7; ns.connect(ng); ng.connect(lp); ns.start();
+    const lfo = C.createOscillator(); lfo.frequency.value = .22; const lg = C.createGain(); lg.gain.value = 70; lfo.connect(lg); lg.connect(lp.frequency); lfo.start();
+  } catch (e) { AU.ctx = null; }
+}
+function updateAudio() {
+  if (!AU.ctx) return;
+  const lv = (state === 'play' || state === 'dead') && AU.on ? Math.min(1, bhLevel) : 0;
+  AU.drone.gain.setTargetAtTime(lv * .55, AU.ctx.currentTime, .4);
+}
+function slurp(str) {
+  if (!AU.ctx || !AU.on || state !== 'play') return;
+  const C = AU.ctx, t = C.currentTime; if (t - AU.last < .07) return; AU.last = t;
+  const o = C.createOscillator(), g = C.createGain(), f = C.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 900;
+  o.type = 'sawtooth'; o.frequency.setValueAtTime(180 + Math.random() * 120, t); o.frequency.exponentialRampToValueAtTime(28, t + .55);
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.22 * str, t + .03); g.gain.exponentialRampToValueAtTime(.001, t + .6);
+  o.connect(f); f.connect(g); g.connect(AU.master); o.start(t); o.stop(t + .65);
+}
+addEventListener('pointerdown', initAudio); addEventListener('keydown', initAudio);
+let state = 'title', time = 0, playT = 0, eaten = 0, hits = 0, endT = 0;
+let zoom = 30, bgX = 0, bgY = 0;
+let theme = 'quantum', prevTheme = null, themeFade = 1, themeDur = 1.5;
+let shake = 0, flashA = 0, flashCol = '#fff';
+const keys = {};
+
+const ZOOM5 = 5 / 3, SPD = Math.min(1, 2.2 / ZOOM5); // 화면 확대 배율 (처음보다 약 1.7배). 속도는 화면 속 빠르기가 너무 빨라지지 않게 맞춤
+const screenR = () => Math.min(W, H) * .028 * ZOOM5;
+const viewR = () => Math.hypot(W, H) / 2 / (screenR() / P.r);
+
+function rnd(a, b) { return a + Math.random() * (b - a); }
+function logRnd(a, b) { return Math.exp(rnd(Math.log(a), Math.log(b))); }
+
+function addObj(x, y, m, extra) {
+  const st = Math.min(26, stageOf(m)), sp = STAGES[st].spin;
+  const o = { x, y, vx: 0, vy: 0, wx: 0, wy: 0, m, r: radOf(m), st, dst: st, v: (Math.random() * VARS(st)) | 0, ang: sp ? Math.random() * TAU : 0, spin: sp ? (Math.random() - .5) * 1.4 * sp : 0,
+    dead: 0, gone: false, pick: 0, deb: false, life: Infinity, fade: 0,
+    ai: true, hunter: true, think: Math.random() * .4, mode: 0, ax: 0, ay: 0, tp: false, chase: rnd(2, 3.4) * SPD, flee: rnd(2.6, 4.6) * SPD, lbm: -1, lbl: '' };
+  Object.assign(o, extra || {}); objs.push(o); return o;
+}
+function grow(o) { o.r = radOf(o.m); o.st = Math.min(26, stageOf(o.m)); }
+function spawnObj(rmin, rmax, safeR) {
+  const a = Math.random() * TAU, d = Math.sqrt(rnd(rmin * rmin, rmax * rmax));
+  const x = P.x + Math.cos(a) * d, y = P.y + Math.sin(a) * d;
+  // 스폰 범위: 내 단계보다 1단계 아래 ~ 2단계 위
+  const lo = P.st > 0 ? stageStart(P.st - 1) : P.m / 40;
+  let hi = stageStart(Math.min(WIN_STAGE, P.st + 3)); if (hi < P.m * 1.3) hi = P.m * 1.3;
+  const foodLo = Math.max(lo, P.m / 40), foodHi = P.m * .2, hasFood = foodHi > foodLo * 1.05;
+  const k = Math.random();
+  if (hasFood && k < .1) { // 작은 먹이 무리
+    const n = 5 + (Math.random() * 7 | 0), fh = Math.max(foodLo * 1.01, Math.min(foodHi, foodLo * 4));
+    for (let i = 0; i < n; i++) { const o = addObj(x + rnd(-1, 1) * P.r * 4, y + rnd(-1, 1) * P.r * 4, logRnd(foodLo, fh)); drift(o, .15); }
+    return;
+  }
+  let m;
+  if (hasFood && k < .64) m = logRnd(foodLo, foodHi);
+  else if (k < .84) m = logRnd(Math.max(lo, P.m * .21), P.m * .95);
+  else m = P.m * 1.15 * Math.pow(hi / (P.m * 1.15), Math.random() ** 2);
+  const ratio = m / P.m;
+  if (ratio > 1 && safeR && d < safeR) { const k2 = safeR * 1.15 / d; o0x = P.x + (x - P.x) * k2; o0y = P.y + (y - P.y) * k2; } else { o0x = x; o0y = y; }
+  const o = addObj(o0x, o0y, m, {});
+  drift(o, ratio > 1 ? .25 : .45);
+}
+function drift(o, s) { const a = Math.random() * TAU, sp = P.r * rnd(.05, s) * 1.5 * SPD; o.vx = o.wx = Math.cos(a) * sp; o.vy = o.wy = Math.sin(a) * sp; }
+function relevantCount() { let n = 0; for (const o of objs) if (!o.dead && !o.deb && !o.sat && o.m > P.m / 60) n++; return n; }
+function fillWorld(initial) {
+  const Rv = viewR();
+  if (initial) { for (let i = 0; i < 110; i++) spawnObj(P.r * 5, Rv * 1.6, Rv); return; }
+  let need = 115 - relevantCount(), tries = 0;
+  while (need > 0 && tries++ < 4 && objs.length < 320) { spawnObj(Rv * 1.08, Rv * 1.7); need--; }
+}
+
+function newGame(fromStage) {
+  const st = fromStage || 0;
+  P.x = 0; P.y = 0; P.vx = P.vy = 0; P.m = st ? stageStart(st) * 1.25 : 1.2; P.r = radOf(P.m); P.st = stageOf(P.m); P.inv = 2; P.v = (Math.random() * 3) | 0;
+  if (!fromStage) { P.maxSt = 0; playT = 0; eaten = 0; hits = 0; broke = 0; P.planet = null; }
+  if (P.st === 13) { if (P.planet == null) setTimeout(askPlanet, 0); else P.v = P.planet; }
+  objs = []; parts = []; stageT = playT;
+  zoom = screenR() / P.r;
+  setTheme(themeFor(P.st), true);
+  fillWorld(true);
+  buildLadder(); updateHud(true);
+}
+
+/* ───────────────────────── 이벤트: 먹기 / 데미지 ───────────────────────── */
+function burst(x, y, col, n, spd, size) {
+  for (let i = 0; i < n; i++) { const a = Math.random() * TAU, s = P.r * rnd(.5, spd || 3) * SPD; parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rnd(.4, 1), max: 1, s: P.r * rnd(.05, size || .14), col }); }
+  if (parts.length > 500) parts.splice(0, parts.length - 500);
+}
+// 조각내기: mass 를 여러 조각으로 나눠 흩뿌림 (다시 먹으면 회복)
+function shatter(x, y, mass, src, rad, ang, spread, speed, own) {
+  const n = objs.length > 400 ? 3 : 5 + (Math.random() * 4 | 0);
+  const w = Array.from({ length: n }, () => rnd(.6, 1.4)), sum = w.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < n; i++) {
+    const a = ang == null ? Math.random() * TAU : ang + rnd(-spread, spread), sp = speed * SPD * rnd(.45, 1.15), off = rad * rnd(.3, 1.1);
+    addObj(x + Math.cos(a) * off, y + Math.sin(a) * off, mass * w[i] / sum, { deb: true, dst: src, ai: false, pick: .7, life: 40, fade: 1, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, spin: rnd(-3, 3), own: !!own });
+  }
+}
+function eat(o) {
+  o.dead = 1; eaten++;
+  P.m += o.m * gainOf(o);
+  if (P.st >= BH_STAGE && P.st <= 21) slurp(1);
+  burst(o.x, o.y, STAGES[o.deb ? o.dst : o.st].c, 6);
+  checkStage();
+}
+// 1/5 ~ 나만 한 물체에 부딪힘: 상대는 조각나고, 나도 조금 조각남
+function smash(o, ratio) {
+  o.gone = true; broke++;
+  const ang = Math.atan2(o.y - P.y, o.x - P.x);
+  shatter(o.x, o.y, o.m, o.st, o.r, ang, 1.4, P.r * 5);
+  burst(o.x, o.y, STAGES[o.st].c, 14, 5);
+  if (P.inv <= 0) { hurt(P.m * (.06 + .14 * ratio), ang + Math.PI, '#ffc04a', .45); P.inv = .3; }
+  else shake = Math.max(shake, .2);
+}
+function hurt(loss, awayAng, col, shakeAmt, by) {
+  loss = Math.min(loss, P.m - .35); if (loss <= 0) return;
+  hits++;
+  P.m -= loss; P.r = radOf(P.m);
+  if (P.st >= BH_STAGE && by) { by.m += loss; grow(by); } // 블랙홀 이상: 조각 없이 상대에게 삼켜짐
+  else shatter(P.x, P.y, loss * .9, P.st, P.r * 1.2, awayAng, 1.3, P.r * 8, true);
+  burst(P.x, P.y, STAGES[P.st].c, 16, 6, .2);
+  shake = Math.max(shake, shakeAmt); flashA = Math.max(flashA, .35); flashCol = col;
+  checkStage();
+}
+function die(o) {
+  state = 'dead';
+  if (P.st >= BH_STAGE) { o.m += P.m; grow(o); } else shatter(P.x, P.y, P.m * .9, P.st, P.r, null, 0, P.r * 6);
+  burst(P.x, P.y, '#ff5a5a', 40, 8, .25); shake = 1; flashA = .7; flashCol = '#ff4a5a';
+  document.getElementById('deadWhy').textContent = `나보다 훨씬 큰 「${STAGES[o.st].n}」에 ${P.st >= BH_STAGE ? '통째로 삼켜졌다' : '부딪혀 산산조각 났다'}.  (현재: ${STAGES[P.st].n})`;
+  setTimeout(() => show('dead'), 900);
+}
+
+// ── 위성 ──
+const SAT_STAGE = 13, SAT_COL = '#7fd8ff';
+const satCap = () => P.st >= SAT_STAGE ? 2 * (P.st - SAT_STAGE + 1) : 0;
+const satList = () => objs.filter(o => o.sat && !o.gone);
+function askPlanet() {
+  if (state !== 'play') return;
+  state = 'pick'; show('pick');
+  const g = document.getElementById('pickGrid');
+  if (!g.children.length) PLANETS.forEach((n, i) => {
+    const b = document.createElement('button'); b.className = 'pcard';
+    const cv2 = mk(100, 100); cv2.getContext('2d').drawImage(SPRITES[13][i], 0, 0, 100, 100);
+    b.appendChild(cv2); b.appendChild(document.createTextNode(`${i + 1}. ${n}`));
+    b.onclick = () => { b.blur(); choosePlanet(i); }; g.appendChild(b);
+  });
+}
+function choosePlanet(i) { P.planet = i; P.v = i; state = 'play'; show(''); updateHud(true); toast(`🪐 ${PLANETS[i]}이(가) 되었어요`); }
+function makeSat(o) {
+  o.sat = true; o.ai = false; o.hunter = false; o.mode = 0; o.tp = false; o.tgt = null; o.satT = 0;
+  burst(o.x, o.y, SAT_COL, 14, 4); toast(`🛰️ ${STAGES[o.st].n} 이(가) 내 위성이 되었어요`);
+}
+function loseSat(o, msg) { o.gone = true; burst(o.x, o.y, SAT_COL, 14, 4); if (msg) toast(msg); }
+// 위성이 먹이를 삼킴: 질량은 나에게 전달
+function satEat(o) { o.dead = 1; eaten++; P.m += o.m * gainOf(o); burst(o.x, o.y, SAT_COL, 4, 2, .08); checkStage(); }
+// 위성 움직임: 가까운 작은 천체를 공격, 없으면 내 주위를 돎
+function satStep(o, i, n, dt) {
+  o.satT -= dt;
+  if (o.satT <= 0) {
+    o.satT = .3; o.tgt = null; let best = Infinity;
+    for (const e of objs) {
+      if (e === o || e.sat || e.dead || e.gone || e.pick > 0 || e.m > o.m * .95 || e.m < P.m / 200) continue;
+      const dp = Math.hypot(e.x - P.x, e.y - P.y); if (dp > P.r * 14) continue;
+      const de = Math.hypot(e.x - o.x, e.y - o.y); if (de < best) { best = de; o.tgt = e; }
+    }
+  }
+  let tx, ty, sp;
+  if (o.tgt && !o.tgt.gone && !o.tgt.dead) { tx = o.tgt.x; ty = o.tgt.y; sp = P.r * 9 * SPD; }
+  else { const a = time * .8 + i * TAU / n, rr = P.r * (2.3 + (i % 2) * .7); tx = P.x + Math.cos(a) * rr; ty = P.y + Math.sin(a) * rr; sp = P.r * 12 * SPD; }
+  let vx = (tx - o.x) * 4, vy = (ty - o.y) * 4; const l = Math.hypot(vx, vy); if (l > sp) { vx *= sp / l; vy *= sp / l; }
+  const k = 1 - Math.exp(-dt * 6); o.vx = lerp(o.vx, vx + P.vx * (o.tgt ? 0 : 1), k); o.vy = lerp(o.vy, vy + P.vy * (o.tgt ? 0 : 1), k);
+}
+// 위성과 다른 천체가 부딪힘
+function satHit(sat, o, d) {
+  if (o.sat || o.dead || o.gone || o.pick > 0 || d > (sat.r + o.r) * .85) return;
+  const r = o.m / sat.m;
+  if (r <= .2) satEat(o);
+  else if (r <= 1) { o.gone = true; broke++; shatter(o.x, o.y, o.m, o.st, o.r, Math.atan2(o.y - sat.y, o.x - sat.x), 1.4, P.r * 4); burst(o.x, o.y, STAGES[o.st].c, 10, 4); }
+  else { // 더 큰 천체에 부딪히면 위성이 부서짐
+    sat.gone = true;
+    if (o.st >= BH_STAGE) { o.m += sat.m; grow(o); } else shatter(sat.x, sat.y, sat.m, sat.st, sat.r, null, 0, P.r * 4);
+    burst(sat.x, sat.y, SAT_COL, 16, 5); toast('💥 위성이 부서졌어요');
+  }
+}
+// 마우스: 클릭 = 위성 만들기, 꾹 누르기 = 위성 없애기
+const mouse = { x: 0, y: 0, down: false, hold: null, holdT: 0 };
+function pickAt(mx, my) {
+  const wx = P.x + (mx - W / 2) / zoom, wy = P.y + (my - H / 2) / zoom;
+  let best = null, bd = Infinity;
+  for (const o of objs) {
+    if (o.gone || o.dead) continue;
+    const d = Math.hypot(o.x - wx, o.y - wy), hit = Math.max(o.r * 1.25, 12 / zoom);
+    if (d < hit && d < bd) { bd = d; best = o; }
+  }
+  return best;
+}
+cv.addEventListener('mousedown', e => {
+  if (state !== 'play') return;
+  mouse.down = true; mouse.x = e.clientX; mouse.y = e.clientY;
+  const o = pickAt(e.clientX, e.clientY); if (!o) return;
+  if (o.sat) { mouse.hold = o; mouse.holdT = 0; return; }
+  if (P.st < SAT_STAGE) { toast('🛰️ 위성은 행성 단계부터 만들 수 있어요'); return; }
+  if (o.deb) { toast('조각은 위성이 될 수 없어요'); return; }
+  if (o.m > P.m / 5) { toast('나의 1/5 이하로 작은 천체만 위성이 될 수 있어요'); return; }
+  if (satList().length >= satCap()) { toast(`위성은 지금 최대 ${satCap()}개까지예요`); return; }
+  makeSat(o);
+});
+addEventListener('mouseup', () => { mouse.down = false; mouse.hold = null; });
+cv.addEventListener('mousemove', e => {
+  mouse.x = e.clientX; mouse.y = e.clientY;
+  if (state !== 'play' || P.st < SAT_STAGE) { cv.style.cursor = ''; return; }
+  const o = pickAt(e.clientX, e.clientY);
+  cv.style.cursor = o && (o.sat || (!o.deb && o.m <= P.m / 5)) ? 'pointer' : '';
+});
+let toastT = 0;
+function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 1800); }
+
+// 다른 물질들의 생각: 작은 것은 쫓고, 큰 것에게서는 도망
+function npcThink(dt, Rv, playing) {
+  const huntOK = playing && playT - stageT > 5;
+  for (const o of objs) {
+    if (o.dead || o.gone || o.deb || !o.ai) continue;
+    if (o.m < P.m / 120) { o.mode = 0; continue; }
+    o.think -= dt; if (o.think > 0) continue;
+    o.think = .25 + Math.random() * .3;
+    const sense = Math.min(Rv * .9, o.r * 14);
+    let mode = 0, ax = 0, ay = 0, best = 0, tdist = Infinity, tp = false;
+    const look = (ex, ey, em, isP) => {
+      const dx = ex - o.x, dy = ey - o.y, d = Math.hypot(dx, dy) || 1;
+      if (d > sense) return;
+      const r = em / o.m;
+      if (r > 1.1) { if (d < sense * .6 && d < tdist) { tdist = d; mode = 2; ax = -dx / d; ay = -dy / d; tp = false; } }
+      else if (o.hunter && mode !== 2 && r < .95 && r > .01) {
+        if (isP && !huntOK) return;
+        const sc = r / d; if (sc > best) { best = sc; mode = 1; ax = dx / d; ay = dy / d; tp = isP; }
+      }
+    };
+    if (playing) look(P.x, P.y, P.m, true);
+    for (const e of objs) if (e !== o && !e.dead && !e.gone && e.pick <= 0) look(e.x, e.y, e.m, false);
+    o.mode = mode; o.ax = ax; o.ay = ay; o.tp = tp && mode === 1;
+  }
+}
+// 다른 물질끼리 부딪힘: 1/5 이하는 삼키고, 그보다 크면 쫓던 쪽이 상대를 깨뜨림
+function npcCollide() {
+  const L = [];
+  for (const o of objs) if (!o.dead && !o.gone && o.m > P.m / 200) L.push(o);
+  L.sort((a, b) => a.x - b.x);
+  let maxR = 0; for (const o of L) if (o.r > maxR) maxR = o.r;
+  for (let i = 0; i < L.length; i++) {
+    const a = L[i]; if (a.gone) continue;
+    for (let j = i + 1; j < L.length; j++) {
+      const b = L[j]; if (b.x - a.x > a.r + maxR) break;
+      if (b.gone || a.gone) continue;
+      if (a.sat || b.sat) { if (!(a.sat && b.sat)) { const sat = a.sat ? a : b; satHit(sat, sat === a ? b : a, Math.hypot(a.x - b.x, a.y - b.y)); } continue; }
+      const big = a.m >= b.m ? a : b, sm = big === a ? b : a;
+      if (big.deb || sm.pick > 0 || big.pick > 0) continue;
+      const d = Math.hypot(a.x - b.x, a.y - b.y), r = sm.m / big.m;
+      if (r <= .2) {
+        if (d < big.r + sm.r * .3) { big.m += sm.m; grow(big); sm.gone = true; burst(sm.x, sm.y, STAGES[big.st].c, 3, 2, .08); }
+      } else if (big.st >= BH_STAGE) {
+        if (d < big.r + sm.r * .4) { big.m += sm.m; grow(big); sm.gone = true; if (big.st <= 21 && Math.hypot(big.x - P.x, big.y - P.y) < viewR()) slurp(.35); }
+      } else if (big.ai && big.mode === 1 && d < (big.r + sm.r) * .8) {
+        sm.gone = true;
+        shatter(sm.x, sm.y, sm.m, sm.st, sm.r, Math.atan2(sm.y - big.y, sm.x - big.x), 1.4, P.r * 4);
+        burst(sm.x, sm.y, STAGES[sm.st].c, 10, 4);
+      }
+    }
+  }
+}
+function checkStage() {
+  P.r = radOf(P.m);
+  const ns = stageOf(P.m);
+  if (ns === P.st) return;
+  const up = ns > P.st; P.st = ns; stageT = playT;
+  if (ns >= WIN_STAGE) { win(); return; }
+  if (ns === 13) { if (P.planet == null) setTimeout(askPlanet, 0); else P.v = P.planet; }
+  if (up && ns !== 13) { P.v = (Math.random() * 3) | 0; burst(P.x, P.y, STAGES[ns].c, 30, 6, .2); }
+  if (ns > P.maxSt) { P.maxSt = ns; banner(ns); }
+  const t = themeFor(ns);
+  if (t !== theme) { setTheme(t); if (ns === 11 && up) { flashA = 1; flashCol = '#ffffff'; } }
+  buildLadder(); updateHud(true);
+}
+function setTheme(t, instant) {
+  if (instant) { theme = t; prevTheme = null; themeFade = 1; return; }
+  prevTheme = theme; theme = t; themeFade = 0; themeDur = t === 'space' ? 3 : 1.6;
+}
+function win() {
+  state = 'ending'; endT = 0; P.st = 26; flashA = 1; flashCol = '#ffffff'; setHudVisible(false);
+  setTimeout(() => {
+    const t = Math.floor(playT), mm = Math.floor(t / 60), ss = t % 60;
+    document.getElementById('winStats').textContent = `걸린 시간 ${mm}분 ${ss}초 · 삼킨 것 ${eaten}개 · 깨뜨린 것 ${broke}개 · 받은 데미지 ${hits}번`;
+    show('win');
+  }, 5800);
+}
+
+/* ───────────────────────── 업데이트 ───────────────────────── */
+function update(dt) {
+  time += dt;
+  if (themeFade < 1) themeFade = Math.min(1, themeFade + dt / themeDur);
+  const th = THEMES[theme];
+
+  if (state === 'title') { bgX += 22 * dt; bgY += 8 * dt; return; }
+  if (state === 'pause' || state === 'devpause' || state === 'pick') { updateAudio(); return; }
+  if (state === 'ending') {
+    endT += dt; bgX += (30 + endT * 260) * dt;
+    const k = 1 - Math.exp(-dt * (.5 + endT * 1.4)); // 모든 것이 나선을 그리며 빨려 들어감
+    for (const o of objs) { const dx = P.x - o.x, dy = P.y - o.y; o.x += dx * k - dy * k * .6; o.y += dy * k + dx * k * .6; o.ang += dt * 4; }
+    shake = endT < 3.8 ? Math.min(.8, endT * .22) : 0; flashA = Math.max(0, flashA - dt * 1.4);
+    for (let i = parts.length - 1; i >= 0; i--) { const p = parts[i]; p.life -= dt; if (p.life <= 0) parts.splice(i, 1); }
+    return;
+  }
+
+  const playing = state === 'play';
+  if (playing) playT += dt;
+
+  // 카메라 확대/축소 (부드럽게)
+  const zt = screenR() / P.r;
+  zoom = Math.exp(lerp(Math.log(zoom), Math.log(zt), 1 - Math.exp(-dt * 3)));
+
+  // 이동
+  // 부스터: Space 를 누르고 움직이면 1.5배 빠름. 대신 질량을 1초에 1.5%씩 씀
+  let ix = 0, iy = 0;
+  if (playing) {
+    ix = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0);
+    iy = (keys.KeyS || keys.ArrowDown ? 1 : 0) - (keys.KeyW || keys.ArrowUp ? 1 : 0);
+    const l = Math.hypot(ix, iy); if (l) { ix /= l; iy /= l; }
+  }
+  boosting = playing && keys.Space && (ix || iy) && P.m > .5;
+  const maxSp = P.r * 7 * SPD * (boosting ? 1.5 : 1), acc = maxSp * 5;
+  if (playing) { P.vx += ix * acc * dt; P.vy += iy * acc * dt; }
+  if (boosting) {
+    P.m -= P.m * .015 * dt; P.r = radOf(P.m); checkStage();
+    for (let n = 0; n < 2; n++) { // 뒤로 뿜어져 나오는 불꽃
+      const a = Math.atan2(-iy, -ix) + rnd(-.35, .35), sp = P.r * rnd(4, 8);
+      parts.push({ x: P.x - ix * P.r * .9, y: P.y - iy * P.r * .9, vx: Math.cos(a) * sp + P.vx * .3, vy: Math.sin(a) * sp + P.vy * .3, life: .5, max: .5, s: P.r * rnd(.08, .18), col: Math.random() < .5 ? '#9fe2ff' : '#ffffff' });
+    }
+  }
+  const f = Math.exp(-5 * dt); P.vx *= f; P.vy *= f;
+  P.x += P.vx * dt; P.y += P.vy * dt;
+  P.inv = Math.max(0, P.inv - dt);
+  bgX += P.vx * zoom * dt + th.drift[0] * dt; bgY += P.vy * zoom * dt + th.drift[1] * dt;
+
+  // 꼬리 입자
+  if (playing && Math.hypot(P.vx, P.vy) > P.r * 2 && Math.random() < .6) {
+    const a = Math.random() * TAU;
+    parts.push({ x: P.x + Math.cos(a) * P.r * .6, y: P.y + Math.sin(a) * P.r * .6, vx: -P.vx * .1, vy: -P.vy * .1, life: .7, max: .7, s: P.r * rnd(.06, .14), col: STAGES[P.st].c });
+  }
+
+  // 물체
+  const Rv = viewR();
+  npcThink(dt, Rv, playing);
+  npcCollide();
+  const sats = satList(); sats.forEach((o, i) => satStep(o, i, sats.length, dt));
+  if (mouse.hold) { // 꾹 누르면 위성 없애기
+    mouse.holdT += dt;
+    if (mouse.hold.gone) mouse.hold = null;
+    else if (mouse.holdT >= .6) { loseSat(mouse.hold, '🛰️ 위성을 없앴어요'); mouse.hold = null; }
+  }
+  for (let i = objs.length - 1; i >= 0; i--) {
+    const o = objs[i];
+    if (o.gone) { objs.splice(i, 1); continue; }
+    if (o.dead) {
+      o.dead -= dt * 4; o.x = lerp(o.x, P.x, 1 - Math.exp(-dt * 14)); o.y = lerp(o.y, P.y, 1 - Math.exp(-dt * 14));
+      if (o.dead <= 0) objs.splice(i, 1); continue;
+    }
+    if (o.sat) {
+      o.x += o.vx * dt; o.y += o.vy * dt; o.ang += o.spin * dt; o.fade = 1;
+      if (P.st - o.st >= 2) loseSat(o, '🛰️ 너무 작아진 위성이 소멸했어요'); // 나보다 2단계 아래면 소멸
+      continue;
+    }
+    const dx = P.x - o.x, dy = P.y - o.y, d = Math.hypot(dx, dy), ratio = o.m / P.m;
+    if (playing && P.st >= 11 && ratio < 1 && d > 1e-9 && d < P.r * 12) {
+      const gr = P.r * 3 * SPD * SPD / Math.max(1, (d / P.r) ** 2) * (P.st >= BH_STAGE ? 2.5 : 1);
+      o.vx += dx / d * gr * dt; o.vy += dy / d * gr * dt;
+    }
+    if (o.ai && !o.deb) {
+      const k = 1 - Math.exp(-dt * 2.5);
+      if (o.mode) { const tv = P.r * (o.mode === 1 ? o.chase : o.flee); o.vx = lerp(o.vx, o.ax * tv, k); o.vy = lerp(o.vy, o.ay * tv, k); }
+      else { o.vx = lerp(o.vx, o.wx, k * .3); o.vy = lerp(o.vy, o.wy, k * .3); }
+    }
+    if (o.deb) { const df = Math.exp(-1.8 * dt); o.vx *= df; o.vy *= df; o.pick -= dt; o.life -= dt; }
+    o.x += o.vx * dt; o.y += o.vy * dt; o.ang += o.spin * dt;
+    o.fade = Math.min(1, o.fade + dt * 2);
+
+    if (d > Rv * 2.6 || o.life <= 0 || ratio < 1 / 900) { objs.splice(i, 1); continue; }
+    if (!playing || o.pick > 0) continue;
+
+    if (ratio <= .2) { if (d < P.r + o.r * .4) eat(o); }
+    else if (ratio <= 1) { if (P.st >= BH_STAGE) { if (d < P.r + o.r * .4) eat(o); } else if (d < (P.r + o.r) * .8) smash(o, ratio); }
+    else if (d < (P.r + o.r) * .82 && P.inv <= 0) {
+      if (ratio > 2.2) { die(o); return; }
+      const away = Math.atan2(-dy, -dx) + Math.PI;
+      P.vx = Math.cos(away) * maxSp * 3; P.vy = Math.sin(away) * maxSp * 3; P.inv = 1.6;
+      hurt(P.m * .4, away, '#ff4a5a', 1, o);
+    }
+  }
+  if (playing) fillWorld(false);
+
+  // 입자
+  for (let i = parts.length - 1; i >= 0; i--) { const p = parts[i]; p.life -= dt; if (p.life <= 0) { parts.splice(i, 1); continue; } p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= .96; p.vy *= .96; }
+
+  shake = Math.max(0, shake - dt * 2.2); flashA = Math.max(0, flashA - dt * 1.4);
+  if (playing) updateHud(false);
+}
+
+/* ───────────────────────── 그리기 ───────────────────────── */
+function tileDraw(img, offX, offY, size) {
+  const sx = -(((offX % size) + size) % size), sy = -(((offY % size) + size) % size);
+  for (let x = sx; x < W; x += size) for (let y = sy; y < H; y += size) ctx.drawImage(img, x, y, size, size);
+}
+function drawTheme(name, alpha) {
+  const th = THEMES[name];
+  ctx.globalAlpha = alpha;
+  const g = ctx.createRadialGradient(W * .5, H * .45, 0, W * .5, H * .5, Math.hypot(W, H) * .65);
+  g.addColorStop(0, th.bg[1]); g.addColorStop(.55, th.bg[0]); g.addColorStop(1, th.bg[2]);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  const ph = th.photo && PHOTOS[th.photo];
+  if (ph) { // 실제 사진: 아주 느리게 움직이고, 가까운 별 한 층만 겹쳐서 움직이는 느낌
+    drawPhoto(ph, th, alpha);
+    ctx.globalCompositeOperation = 'lighter';
+    if (th.rays) drawRays(th, alpha); ctx.globalAlpha = alpha * .55;
+    tileDraw(th.layerImg[2], bgX * .65, bgY * .65, TILE);
+    drawTwinkles(th, alpha);
+    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+    return;
+  }
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalAlpha = alpha * th.nebA;
+  tileDraw(th.nebImg, bgX * .03 + time * 2, bgY * .03, 1700);
+  ctx.globalAlpha = alpha * th.nebA * .6;
+  tileDraw(th.nebImg, bgX * .07 - 600, bgY * .07 + 300 - time * 3, 1100);
+  if (th.rays) {
+    for (let k = 0; k < 6; k++) {
+      ctx.save(); ctx.globalAlpha = alpha * (.5 + .5 * Math.sin(time * .4 + k * 1.7));
+      ctx.translate(W * (.05 + k * .18) + Math.sin(time * .2 + k) * 60, -40); ctx.rotate(.32 + Math.sin(time * .13 + k) * .05);
+      const w = 60 + (k * 37) % 90, lg = ctx.createLinearGradient(0, 0, 0, H * 1.3);
+      lg.addColorStop(0, hexA(th.rays, .13)); lg.addColorStop(1, hexA(th.rays, 0)); ctx.fillStyle = lg; ctx.fillRect(-w / 2, 0, w, H * 1.3); ctx.restore();
+    }
+  }
+  const par = [.12, .3, .65];
+  th.layerImg.forEach((img, L) => { ctx.globalAlpha = alpha; tileDraw(img, bgX * par[L] - th.drift[0] * time * L * .3, bgY * par[L] - th.drift[1] * time * L * .3, TILE); });
+  drawTwinkles(th, alpha);
+  ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+}
+function drawRays(th, alpha) { // 위에서 비스듬히 내려오는 햇빛 줄기
+  for (let k = 0; k < 6; k++) {
+    ctx.save(); ctx.globalAlpha = alpha * (.5 + .5 * Math.sin(time * .4 + k * 1.7));
+    ctx.translate(W * (.05 + k * .18) + Math.sin(time * .2 + k) * 60, -40); ctx.rotate(.32 + Math.sin(time * .13 + k) * .05);
+    const w = 60 + (k * 37) % 90, lg = ctx.createLinearGradient(0, 0, 0, H * 1.3);
+    lg.addColorStop(0, hexA(th.rays, .16)); lg.addColorStop(1, hexA(th.rays, 0)); ctx.fillStyle = lg; ctx.fillRect(-w / 2, 0, w, H * 1.3); ctx.restore();
+  }
+}
+function drawPhoto(img, th, alpha) {
+  const h = (th.flipX ? Math.max(W, H) : H) * th.pScale, w = img.width / img.height * h;
+  const pp = th.pPar || .02, ox = bgX * pp + (w / 2 - W / 2), oy = bgY * pp + (h / 2 - H / 2);
+  const sx = -(((ox % w) + w) % w), sy = -(((oy % (2 * h)) + 2 * h) % (2 * h));
+  ctx.globalAlpha = alpha;
+  for (let x = sx, col = 0; x < W; x += w, col++) for (let y = sy, row = 0; y < H; y += h, row++) {
+    const fx = th.flipX && col % 2 === 1, fy = row % 2 === 1; // 뒤집어 이어 붙여서 이음새가 안 보이게
+    if (fx || fy) { ctx.save(); ctx.translate(x + (fx ? w : 0), y + (fy ? h : 0)); ctx.scale(fx ? -1 : 1, fy ? -1 : 1); ctx.drawImage(img, 0, 0, w, h); ctx.restore(); }
+    else ctx.drawImage(img, x, y, w, h);
+  }
+  if (th.pDark) { ctx.globalAlpha = alpha * th.pDark; ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); }
+  ctx.globalAlpha = 1;
+}
+function drawTwinkles(th, alpha) {
+  if (th.tw) {
+    for (const s of th.tw) {
+      const a = alpha * Math.max(0, Math.sin(time * s.sp + s.ph)) ** 3; if (a < .03) continue;
+      const x0 = (((s.x - bgX * .45) % 1024) + 1024) % 1024, y0 = (((s.y - bgY * .45) % 1024) + 1024) % 1024;
+      for (let x = x0; x < W; x += 1024) for (let y = y0; y < H; y += 1024) {
+        ctx.globalAlpha = a; ctx.fillStyle = s.col; const L = s.s * 6;
+        ctx.fillRect(x - L, y - .6, L * 2, 1.2); ctx.fillRect(x - .6, y - L, 1.2, L * 2);
+        ctx.beginPath(); ctx.arc(x, y, s.s, 0, TAU); ctx.fill();
+      }
+    }
+  }
+}
+
+const LABEL_FONT = '11px "Malgun Gothic", sans-serif';
+// 블랙홀 주위로 빛과 가스가 나선을 그리며 빨려 들어감
+function drawInflow(sx, sy, size, seed) {
+  if (size < 5) return;
+  const hash = n => { const v = Math.sin(n * 12.9898 + seed * 78.233) * 43758.5453; return v - Math.floor(v); };
+  ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+  for (let k = 0; k < 22; k++) {
+    const ph = (hash(k) + time * (.25 + hash(k + 50) * .2)) % 1; // 0 = 멀리, 1 = 지평선 바로 앞
+    const rr = size * (.48 + (1 - ph) * (1 - ph) * 2.6), a = hash(k + 100) * TAU + ph * 3.4 + time * .15;
+    const rr2 = rr + size * (.12 + .25 * (1 - ph)), a2 = a - .22 - .3 * ph;
+    const al = .38 * Math.sin(ph * Math.PI);
+    ctx.strokeStyle = `rgba(255,${190 + (ph * 50 | 0)},${140 + (ph * 70 | 0)},${al})`; ctx.lineWidth = .7 + ph * 1.1;
+    ctx.beginPath(); ctx.moveTo(sx + Math.cos(a2) * rr2, sy + Math.sin(a2) * rr2); ctx.lineTo(sx + Math.cos(a) * rr, sy + Math.sin(a) * rr); ctx.stroke();
+  }
+  ctx.globalCompositeOperation = 'source-over'; ctx.lineCap = 'butt';
+}
+
+function drawSprite(img, sx, sy, size, ang, alpha) {
+  const k = size / SR, half = img.width / 2 * k;
+  ctx.globalAlpha = alpha;
+  if (ang) { ctx.save(); ctx.translate(sx, sy); ctx.rotate(ang); ctx.drawImage(img, -half, -half, half * 2, half * 2); ctx.restore(); }
+  else ctx.drawImage(img, sx - half, sy - half, half * 2, half * 2);
+  ctx.globalAlpha = 1;
+}
+
+function draw() {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  if (prevTheme && themeFade < 1) { drawTheme(prevTheme, 1); drawTheme(theme, themeFade); }
+  else drawTheme(theme, 1);
+
+  if (state === 'title') { vignette(); return; }
+
+  const shx = (Math.random() - .5) * shake * 18, shy = (Math.random() - .5) * shake * 18;
+  const cx = W / 2 + shx, cy = H / 2 + shy, z = zoom;
+  const toS = (x, y) => [(x - P.x) * z + cx, (y - P.y) * z + cy];
+
+  bhLevel = 0;
+  // 물체: 작은 것 → 플레이어 → 큰 것 순서
+  const small = [], big = [];
+  for (const o of objs) (o.m <= P.m ? small : big).push(o);
+  big.sort((a, b) => a.m - b.m);
+  const drawObj = (o) => {
+    if (o.gone) return;
+    const [sx, sy] = toS(o.x, o.y); let size = o.r * z;
+    if (o.dead) size *= Math.max(0, o.dead);
+    const ext = size * (o.st === 21 ? 4.2 : o.st === 20 ? 3.4 : 1.7);
+    if (sx + ext < 0 || sy + ext < 0 || sx - ext > W || sy - ext > H) return;
+    let a = o.fade * (o.deb && o.life < 3 ? o.life / 3 : 1);
+    if (size < .7) { ctx.globalAlpha = a * .7; ctx.fillStyle = STAGES[o.deb ? o.dst : o.st].c; ctx.fillRect(sx, sy, 1.2, 1.2); ctx.globalAlpha = 1; return; }
+    if (o.sat) { // 내 위성: 하늘색으로 빛남
+      ctx.globalCompositeOperation = 'lighter';
+      const sg = ctx.createRadialGradient(sx, sy, size * .5, sx, sy, size * 2.2 + 6);
+      sg.addColorStop(0, hexA(SAT_COL, .5 + .15 * Math.sin(time * 4))); sg.addColorStop(1, hexA(SAT_COL, 0));
+      ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(sx, sy, size * 2.2 + 6, 0, TAU); ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    if (!o.deb && o.st >= BH_STAGE && o.st <= 21) { drawInflow(sx, sy, size, (o.v * .37 + o.m % 1) % 1); bhLevel += Math.min(1, size / 60) * .35; }
+    drawSprite(o.deb ? DEBRIS[o.dst][o.v % 2] : sprOf(o.st, o.v), sx, sy, size * (o.deb ? 1 : BIG(o.st)), o.ang, a);
+    if (o.sat) {
+      ctx.strokeStyle = hexA(SAT_COL, .8); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(sx, sy, size * 1.15 + 3, 0, TAU); ctx.stroke();
+      if (mouse.hold === o) { ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(sx, sy, size * 1.15 + 8, -Math.PI / 2, -Math.PI / 2 + TAU * Math.min(1, mouse.holdT / .6)); ctx.stroke(); }
+    }
+    if (!o.dead && size > 7 && state === 'play') {
+      const rt = o.m / P.m;
+      if (o.mode === 2 && rt < 1 && !o.sat) { ctx.globalAlpha = .55; ctx.fillStyle = '#9adfff'; ctx.fillText('💨', sx, sy - size * 1.15 - 4); }
+      ctx.globalAlpha = 1;
+    }
+    if (!o.dead && !o.deb && !o.sat && state === 'play') {
+      const ratio = o.m / P.m;
+      if (ratio <= 1 && ratio > .2 && P.st < BH_STAGE) {
+        ctx.globalAlpha = .45; ctx.strokeStyle = '#ffc04a'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(sx, sy, size * 1.05 + 3, 0, TAU); ctx.stroke(); ctx.globalAlpha = 1;
+      }
+    }
+  };
+  ctx.font = LABEL_FONT; ctx.textAlign = 'center';
+  small.forEach(drawObj);
+
+  // 플레이어
+  if (state !== 'dead') {
+    let ps = P.r * z;
+    if (state === 'ending') ps *= 1 + endT * endT * .8;
+    const blink = P.inv > 0 && state === 'play' ? (Math.sin(time * 30) > 0 ? .45 : 1) : 1;
+    ctx.globalCompositeOperation = 'lighter';
+    const ag = ctx.createRadialGradient(cx, cy, ps * .5, cx, cy, ps * 2.4);
+    ag.addColorStop(0, hexA(STAGES[P.st].c, .28 + .06 * Math.sin(time * 3))); ag.addColorStop(1, hexA(STAGES[P.st].c, 0));
+    ctx.fillStyle = ag; ctx.beginPath(); ctx.arc(cx, cy, ps * 2.4, 0, TAU); ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+    if (P.st >= BH_STAGE && P.st <= 21) { drawInflow(cx, cy, ps, .5); bhLevel += .8; }
+    drawSprite(sprOf(Math.min(26, P.st), P.v), cx, cy, ps * BIG(Math.min(26, P.st)) * (1 + .03 * Math.sin(time * 4)), STAGES[P.st].spin ? time * .5 : 0, blink);
+    ctx.globalAlpha = .35 * blink; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(cx, cy, ps * 1.12 + 3, 0, TAU); ctx.stroke();
+    if (state === 'play') { ctx.globalAlpha = .9; ctx.fillStyle = '#ffffff'; ctx.font = 'bold 12px "Malgun Gothic", sans-serif'; ctx.textAlign = 'center'; ctx.fillText(fmtKg(realMass(P.m)), cx, cy + ps * 1.12 + 17); ctx.font = LABEL_FONT; }
+    ctx.globalAlpha = 1;
+  }
+
+  big.forEach(drawObj);
+
+  // 입자
+  ctx.globalCompositeOperation = 'lighter';
+  for (const p of parts) {
+    const [sx, sy] = toS(p.x, p.y), s = Math.max(1, p.s * z);
+    if (sx < -20 || sy < -20 || sx > W + 20 || sy > H + 20) continue;
+    ctx.globalAlpha = Math.max(0, p.life / p.max); ctx.fillStyle = p.col;
+    ctx.beginPath(); ctx.arc(sx, sy, s, 0, TAU); ctx.fill();
+  }
+  ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+
+  vignette();
+
+  if (flashA > 0) { ctx.globalAlpha = flashA * .5; ctx.fillStyle = flashCol; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
+  if (state === 'ending') drawEnding();
+}
+function drawEnding() {
+  const t = endT, X = W / 2, Y = H / 2, maxR = Math.hypot(W, H) * .6;
+  ctx.globalCompositeOperation = 'lighter';
+  // 1. 나선을 그리며 빨려 들어가는 빛줄기
+  if (t < 4.2) {
+    const inten = Math.min(1, t / 1.5) * (t > 3.6 ? (4.2 - t) / .6 : 1);
+    for (let i = 0; i < 280; i++) {
+      const ph = ((i * .618034) % 1 + t * (.35 + t * .12)) % 1, rr = (1 - ph) * maxR * 1.1, a = i * 2.399963 + ph * 3 + t * .6;
+      const a2 = a - .12, rr2 = rr + 30 + t * 25;
+      ctx.strokeStyle = `hsla(${(i * 37 + t * 90) % 360},100%,70%,${.55 * inten * ph})`; ctx.lineWidth = 1 + ph * 2.5;
+      ctx.beginPath(); ctx.moveTo(X + Math.cos(a) * rr, Y + Math.sin(a) * rr); ctx.lineTo(X + Math.cos(a2) * rr2, Y + Math.sin(a2) * rr2); ctx.stroke();
+    }
+  }
+  // 2. 회전하는 무지개 빛살
+  if (t > .4) {
+    const inten = Math.min(1, (t - .4) / 2);
+    ctx.save(); ctx.translate(X, Y); ctx.rotate(t * .45);
+    for (let k = 0; k < 18; k++) {
+      ctx.rotate(TAU / 18); const w = .05 + .04 * Math.sin(t * 2 + k), hue = (k * 20 + t * 40) % 360;
+      const g = ctx.createLinearGradient(0, 0, maxR * 1.2, 0); g.addColorStop(0, `hsla(${hue},100%,75%,${.32 * inten})`); g.addColorStop(1, `hsla(${hue},100%,60%,0)`);
+      ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(maxR * 1.2, -maxR * w); ctx.lineTo(maxR * 1.2, maxR * w); ctx.fill();
+    }
+    ctx.restore();
+  }
+  // 3. 점점 커지는 중심의 빛
+  const core = Math.min(1, t / 3.6);
+  const cg = ctx.createRadialGradient(X, Y, 0, X, Y, maxR * (.08 + core * .9));
+  cg.addColorStop(0, `rgba(255,255,255,${core})`); cg.addColorStop(.3, `rgba(255,235,255,${core * .6})`); cg.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = cg; ctx.fillRect(0, 0, W, H);
+  // 4. 퍼져 나가는 충격파 고리
+  for (let j = 0; j < 6; j++) {
+    const p = (t - 3.1 - j * .16) / 1.6; if (p < 0 || p > 1) continue;
+    ctx.strokeStyle = `hsla(${(j * 60 + t * 50) % 360},100%,75%,${(1 - p) * .9})`; ctx.lineWidth = 46 * (1 - p) + 2;
+    ctx.beginPath(); ctx.arc(X, Y, p * maxR * 1.5, 0, TAU); ctx.stroke();
+  }
+  // 5. 바깥으로 튀어 나가는 별줄기 (워프)
+  if (t > 3 && t < 5.4) {
+    const inten = Math.min(1, t - 3) * (t > 4.7 ? (5.4 - t) / .7 : 1);
+    for (let i = 0; i < 200; i++) {
+      const a = i * 2.399963, r1 = (((i * .37) % 1) + (t - 3) * 1.3) % 1 * maxR * 1.2, len = 20 + r1 * .6;
+      ctx.strokeStyle = `rgba(255,255,255,${.65 * inten})`; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(X + Math.cos(a) * r1, Y + Math.sin(a) * r1); ctx.lineTo(X + Math.cos(a) * (r1 + len), Y + Math.sin(a) * (r1 + len)); ctx.stroke();
+    }
+  }
+  ctx.globalCompositeOperation = 'source-over';
+  // 6. 하얀 세계 + 은은한 무지갯빛 + 떠다니는 반짝이
+  if (t > 3.9) {
+    ctx.globalAlpha = Math.min(1, (t - 3.9) / .7);
+    ctx.fillStyle = '#fffdf8'; ctx.fillRect(0, 0, W, H);
+    for (let k = 0; k < 4; k++) {
+      const x = W * (.5 + .35 * Math.sin(time * .3 + k * 1.7)), y = H * (.5 + .3 * Math.cos(time * .25 + k * 2.1));
+      const g = ctx.createRadialGradient(x, y, 0, x, y, Math.max(W, H) * .55); g.addColorStop(0, `hsla(${(k * 90 + time * 20) % 360},100%,85%,.45)`); g.addColorStop(1, 'hsla(0,0%,100%,0)');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    }
+    for (let i = 0; i < 80; i++) {
+      const x = (i * 137.5 + time * 12 * (1 + i % 3)) % W, y = H - ((i * 91.3 + time * (15 + i % 5 * 6)) % (H + 40)), tw = .5 + .5 * Math.sin(time * 3 + i);
+      ctx.fillStyle = `hsla(${i * 40 % 360},90%,70%,${.6 * tw})`; ctx.beginPath(); ctx.arc(x, y, 1.5 + tw * 2, 0, TAU); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+}
+function vignette() {
+  const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * .35, W / 2, H / 2, Math.hypot(W, H) * .6);
+  g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,.6)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+}
+
+/* ───────────────────────── 화면 표시 (HUD) ───────────────────────── */
+const $ = id => document.getElementById(id);
+const SUP = { '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹', '-': '⁻' };
+function fmt(m) { if (m < 1000) return m.toFixed(m < 10 ? 2 : 1); const e = Math.floor(Math.log10(m)); return (m / 10 ** e).toFixed(2) + '×10' + String(e).replace(/./g, ch => SUP[ch]); }
+let lastHudSt = -1;
+function updateHud(force) {
+  const st = Math.min(26, P.st);
+  if (force || st !== lastHudSt) {
+    lastHudSt = st;
+    $('stIdx').textContent = `단계 ${st + 1} / ${STAGES.length}`;
+    $('stName').textContent = STAGES[st].n + (st === 13 && P.planet != null ? ` · ${PLANETS[P.planet]}` : '');
+    $('stDesc').textContent = STAGES[st].d;
+  }
+  const lo = Math.log(stageStart(st)), hi = Math.log(stageStart(st + 1));
+  $('barFill').style.width = (Math.max(0, Math.min(1, (Math.log(P.m) - lo) / (hi - lo))) * 100).toFixed(1) + '%';
+  $('sats').textContent = P.st >= SAT_STAGE ? `🛰️ 위성 ${satList().length} / ${satCap()}  (클릭: 만들기 · 꾹 누르기: 없애기)` : '';
+  $('mass').textContent = `무게 ${fmtKg(realMass(P.m))}  ·  다음: ${STAGES[st + 1].n}`;
+}
+function buildLadder() {
+  const el = $('ladder'); el.innerHTML = '';
+  STAGES.forEach((s, i) => { const d = document.createElement('div'); d.textContent = s.n; if (i < P.st) d.className = 'done'; if (i === P.st) d.className = 'cur'; el.prepend(d); });
+}
+function banner(st) {
+  const b = $('banner'); b.querySelector('.n').textContent = STAGES[st].n; b.querySelector('.d').textContent = STAGES[st].d;
+  b.querySelector('.s').textContent = st === 11 ? '우주로 이동합니다' : '새로운 단계';
+  b.classList.remove('show'); void b.offsetWidth; b.classList.add('show');
+}
+function show(id) { for (const o of document.querySelectorAll('.ov')) o.classList.toggle('on', o.id === id); }
+function setHudVisible(v) { for (const id of ['hud', 'ladder', 'legend']) $(id).style.display = v ? 'block' : 'none'; }
+
+/* ───────────────────────── 입력 ───────────────────────── */
+function start(fromStage) { show(''); setHudVisible(true); newGame(fromStage); state = 'play'; }
+let devMode = false, devPrev = null;
+function openDev(on) {
+  $('dev').classList.toggle('on', on);
+  if (on) { devMode = true; $('devBadge').style.display = 'block'; if (state === 'play') { devPrev = 'play'; state = 'devpause'; } }
+  else if (state === 'devpause') state = devPrev || 'play';
+}
+function devJump(i) {
+  openDev(false);
+  if (i >= WIN_STAGE) { start(26); P.m = stageStart(WIN_STAGE); checkStage(); }
+  else start(i);
+  toast(`🛠 ${STAGES[Math.min(i, 27)].n} 단계로 이동했어요`);
+}
+STAGES.forEach((st, i) => { const b = document.createElement('button'); b.textContent = `${i + 1}. ${st.n}`; b.onclick = () => { b.blur(); devJump(i); }; $('devGrid').appendChild(b); });
+addEventListener('keydown', e => {
+  // Shift 를 누르면 관리자 모드 창을 열고 닫음
+  if ((e.code === 'ShiftLeft' || e.code === 'ShiftRight') && !e.repeat && ready) { openDev(!$('dev').classList.contains('on')); return; }
+  if ($('dev').classList.contains('on')) { if (e.code === 'Escape') openDev(false); return; }
+  if (state === 'pick') { const n = parseInt((e.code.match(/^(?:Digit|Numpad)([1-8])$/) || [])[1]); if (n) choosePlanet(n - 1); return; }
+  if (e.code === 'KeyM') { AU.on = !AU.on; toast(AU.on ? '🔊 소리 켬' : '🔇 소리 끔'); }
+  keys[e.code] = true;
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  if (state === 'title' && ready && (e.code === 'Enter' || e.code === 'Space')) start(0);
+  else if (state === 'play' && (e.code === 'KeyP' || e.code === 'Escape')) { state = 'pause'; show('pause'); }
+  else if (state === 'pause' && (e.code === 'KeyP' || e.code === 'Escape')) { state = 'play'; show(''); }
+  else if (state === 'dead' && $('dead').classList.contains('on')) { if (e.code === 'KeyR') start(P.st); else if (e.code === 'Enter') start(0); }
+  else if (state === 'ending' && $('win').classList.contains('on') && e.code === 'Enter') start(0);
+});
+addEventListener('keyup', e => { keys[e.code] = false; });
+addEventListener('blur', () => { for (const k in keys) keys[k] = false; if (state === 'play') { state = 'pause'; show('pause'); } });
+$('startBtn').onclick = () => start(0);
+$('retryBtn').onclick = () => start(P.st);
+$('resetBtn').onclick = () => start(0);
+$('againBtn').onclick = () => start(0);
+
+/* ───────────────────────── 시작 ───────────────────────── */
+let last = performance.now(), ready = false;
+$('startBtn').textContent = '우주를 만드는 중…'; $('startBtn').disabled = true;
+setTimeout(() => { // 첫 화면을 먼저 보여 준 뒤 그림을 만듦
+  buildSprites();
+  let seed = 11; for (const k in THEMES) buildTheme(THEMES[k], seed += 97);
+  PHOTOS.h2 = makeNebula(640); PHOTOS.cells = makeCells(1024); PHOTOS.sand = makeSand(512);
+  ready = true; $('startBtn').textContent = '시작하기'; $('startBtn').disabled = false;
+  window.focus(); // 키 입력이 바로 게임에 들어오도록
+  addEventListener('pointerdown', () => window.focus());
+  last = performance.now(); requestAnimationFrame(frame);
+}, 60);
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  update(dt); draw(); updateAudio();
+  requestAnimationFrame(frame);
+}
+</script>
+</body>
+</html>

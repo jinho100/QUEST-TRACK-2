@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>날씨 앱</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    min-height: 100vh; font-family: "Malgun Gothic", system-ui, sans-serif;
+    background: linear-gradient(160deg, #1e3c72, #2a5298 60%, #4b79c9);
+    color: #fff; display: flex; justify-content: center; padding: 24px 16px;
+  }
+  .app { width: 100%; max-width: 420px; }
+  h1 { font-size: 22px; margin-bottom: 16px; text-align: center; }
+  .card {
+    background: rgba(255,255,255,.14); backdrop-filter: blur(8px);
+    border-radius: 18px; padding: 18px; margin-bottom: 14px;
+  }
+  label { font-size: 13px; opacity: .85; display: block; margin-bottom: 6px; }
+  .row { display: flex; gap: 8px; }
+  input {
+    flex: 1; padding: 11px 12px; border: none; border-radius: 10px;
+    font-size: 15px; min-width: 0;
+  }
+  button {
+    padding: 11px 16px; border: none; border-radius: 10px; cursor: pointer;
+    background: #ffd54a; color: #222; font-weight: bold; font-size: 15px;
+  }
+  button.ghost { background: rgba(255,255,255,.25); color: #fff; font-weight: normal; }
+  .hint { font-size: 12px; opacity: .8; margin-top: 8px; line-height: 1.5; }
+  .hint a { color: #ffe58a; }
+  #msg { text-align: center; min-height: 22px; font-size: 14px; margin-bottom: 8px; }
+  .now { text-align: center; }
+  .now .city { font-size: 20px; }
+  .now .icon { width: 110px; height: 110px; }
+  .now .temp { font-size: 56px; font-weight: bold; line-height: 1; }
+  .now .desc { font-size: 17px; margin: 6px 0 14px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-size: 13px; }
+  .grid div { background: rgba(255,255,255,.12); border-radius: 10px; padding: 8px 4px; text-align: center; }
+  .grid b { display: block; font-size: 16px; margin-top: 2px; }
+  .forecast { display: flex; justify-content: space-between; text-align: center; font-size: 13px; }
+  .forecast img { width: 44px; height: 44px; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>☀️ 날씨 앱</h1>
+
+  <div class="card" id="keyCard">
+    <label for="key">OpenWeatherMap API 키</label>
+    <div class="row">
+      <input id="key" type="password" placeholder="API 키를 붙여 넣어요" autocomplete="off">
+      <button id="saveKey">저장</button>
+    </div>
+    <p class="hint">
+      키는 이 브라우저(localStorage)에만 저장되고 파일이나 GitHub에는 올라가지 않아요.
+      키 발급: <a href="https://openweathermap.org/api" target="_blank" rel="noopener">openweathermap.org</a>
+      (가입 후 활성화까지 10분~2시간 걸릴 수 있어요)
+    </p>
+  </div>
+
+  <div class="card">
+    <label for="city">도시 이름 (영어 권장: Seoul, Busan, Tokyo ...)</label>
+    <div class="row">
+      <input id="city" value="Seoul">
+      <button id="search">검색</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button class="ghost" id="geo" style="flex:1">📍 내 위치로 보기</button>
+      <button class="ghost" id="resetKey">키 지우기</button>
+    </div>
+  </div>
+
+  <div id="msg"></div>
+
+  <div class="card now hidden" id="now">
+    <div class="city" id="cityName"></div>
+    <img class="icon" id="icon" alt="">
+    <div class="temp" id="temp"></div>
+    <div class="desc" id="desc"></div>
+    <div class="grid">
+      <div>체감<b id="feels"></b></div>
+      <div>습도<b id="hum"></b></div>
+      <div>바람<b id="wind"></b></div>
+    </div>
+  </div>
+
+  <div class="card hidden" id="fcCard">
+    <label>앞으로 5일 (낮 12시 기준)</label>
+    <div class="forecast" id="forecast"></div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const BASE = "https://api.openweathermap.org/data/2.5";
+const store = {
+  get() { try { return localStorage.getItem("owm_key") || ""; } catch { return ""; } },
+  set(v) { try { localStorage.setItem("owm_key", v); } catch {} },
+  del() { try { localStorage.removeItem("owm_key"); } catch {} }
+};
+
+$("key").value = store.get();
+
+function say(t, err) { $("msg").textContent = t; $("msg").style.color = err ? "#ffb4b4" : "#fff"; }
+
+async function call(path, params) {
+  const key = store.get();
+  if (!key) throw new Error("먼저 API 키를 저장해 주세요.");
+  const q = new URLSearchParams({ ...params, appid: key, units: "metric", lang: "kr" });
+  const res = await fetch(`${BASE}/${path}?${q}`);
+  const data = await res.json();
+  if (!res.ok) {
+    if (res.status === 401) throw new Error("API 키가 올바르지 않거나 아직 활성화되지 않았어요.");
+    if (res.status === 404) throw new Error("도시를 찾을 수 없어요.");
+    throw new Error(data.message || "오류가 났어요.");
+  }
+  return data;
+}
+
+async function load(params) {
+  say("불러오는 중...");
+  try {
+    const [w, f] = await Promise.all([call("weather", params), call("forecast", params)]);
+    show(w, f);
+    say("");
+  } catch (e) {
+    say(e.message === "Failed to fetch" ? "네트워크 오류예요. 인터넷을 확인해 주세요." : e.message, true);
+  }
+}
+
+const icon = c => `https://openweathermap.org/img/wn/${c}@2x.png`;
+
+function show(w, f) {
+  $("cityName").textContent = `${w.name}, ${w.sys.country}`;
+  $("icon").src = icon(w.weather[0].icon);
+  $("temp").textContent = `${Math.round(w.main.temp)}°C`;
+  $("desc").textContent = w.weather[0].description;
+  $("feels").textContent = `${Math.round(w.main.feels_like)}°`;
+  $("hum").textContent = `${w.main.humidity}%`;
+  $("wind").textContent = `${w.wind.speed}m/s`;
+  $("now").classList.remove("hidden");
+
+  const days = {};
+  f.list.forEach(it => {
+    const d = it.dt_txt.slice(0, 10);
+    if (!days[d] || Math.abs(+it.dt_txt.slice(11, 13) - 12) < Math.abs(+days[d].dt_txt.slice(11, 13) - 12)) days[d] = it;
+  });
+  const names = ["일", "월", "화", "수", "목", "금", "토"];
+  $("forecast").innerHTML = Object.values(days).slice(0, 5).map(it => {
+    const dt = new Date(it.dt * 1000);
+    return `<div>${names[dt.getDay()]}<br><img src="${icon(it.weather[0].icon)}" alt=""><br>${Math.round(it.main.temp)}°</div>`;
+  }).join("");
+  $("fcCard").classList.remove("hidden");
+}
+
+$("saveKey").onclick = () => {
+  const v = $("key").value.trim();
+  if (!v) return say("키를 입력해 주세요.", true);
+  store.set(v); say("키를 저장했어요.");
+};
+$("resetKey").onclick = () => { store.del(); $("key").value = ""; say("키를 지웠어요."); };
+$("search").onclick = () => {
+  const c = $("city").value.trim();
+  if (c) load({ q: c });
+};
+$("city").addEventListener("keydown", e => { if (e.key === "Enter") $("search").click(); });
+$("geo").onclick = () => {
+  if (!navigator.geolocation) return say("이 브라우저는 위치를 지원하지 않아요.", true);
+  say("위치 확인 중...");
+  navigator.geolocation.getCurrentPosition(
+    p => load({ lat: p.coords.latitude, lon: p.coords.longitude }),
+    () => say("위치 권한이 없어요. 도시 이름으로 검색해 주세요.", true)
+  );
+};
+</script>
+</body>
+</html>
